@@ -3,12 +3,12 @@ import jwt from "jsonwebtoken";
 import { config } from "../config";
 
 interface JwtPayload {
-  customerId: string;
+  adminOrManagerId: string;
   email: string;
   role: string;
 }
 
-export const authenticateCustomer = (
+export const authenticateAdminOrManager = (
   req: Request,
   res: Response,
   next: NextFunction
@@ -24,13 +24,13 @@ export const authenticateCustomer = (
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, config.jwt_secret) as JwtPayload;
 
-    if (decoded.role !== "customer") {
-      res.status(403).json({ message: "Forbidden: Not a customer" });
+    if (decoded.role !== "admin" && decoded.role !== "manager") {
+      res.status(403).json({ message: "Forbidden: Not an admin or manager" });
       return;
     }
 
     (req as any).user = {
-      userId: decoded.customerId,
+      userId: decoded.adminOrManagerId,
       email: decoded.email,
       role: decoded.role,
     };

@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-export interface ICustomer extends Document {
+export interface IWorker extends Document {
   firstName: string;
   lastName?: string;
   address: string;
@@ -9,15 +9,16 @@ export interface ICustomer extends Document {
   phone: string;
   email: string;
   isBlocked: boolean;
-  password?: string | null;
-  uploadPhoto?: string | null;
+  password: string;
+  workerId: string;
+  uploadPhoto: string | null;
   resetOtp?: number | null;
   otpExpires?: Date | null;
   otpVerified?: boolean;
   role: string;
 }
 
-const customerSchema = new Schema<ICustomer>(
+const workerSchema = new Schema<IWorker>(
   {
     firstName: { type: String, required: true },
     lastName: { type: String, required: false },
@@ -26,15 +27,16 @@ const customerSchema = new Schema<ICustomer>(
     state: { type: String, required: true },
     phone: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, default: null },
+    password: { type: String, required: true },
     uploadPhoto: { type: String, default: null },
     isBlocked: { type: Boolean, default: false },
+    workerId: { type: String },
     resetOtp: { type: Number, default: null },
     otpExpires: { type: Date, default: null },
     otpVerified: { type: Boolean, default: false },
-    role: { type: String, default: "customer" },
+    role: { type: String, default: "worker" },
   },
   { timestamps: true }
 );
 
-export const CustomerModel = model<ICustomer>("Customer", customerSchema);
+export const WorkerModel = model<IWorker>("Worker", workerSchema);

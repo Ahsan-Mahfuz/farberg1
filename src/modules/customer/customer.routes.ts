@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  loginCustomer,
+  loginCustomerOrWorker,
   updateProfile,
   getMyProfile,
   sendOtp,
@@ -8,11 +8,13 @@ import {
   createCustomer,
   setPassword,
   uploadProfilePicture,
+  verifyOtp,
 } from "./customer.controller";
-import { authenticateCustomer } from "../../middlewares/customerMiddleware";
+import { customerOrWorkerMiddleware } from "../../middlewares/customerOrWorkerMiddleware";
 import { customerPhotoUpload } from "../../uploads/customerPhotoUpload";
 
 const customerRouter = express.Router();
+const customerOrWorkerRouter = express.Router();
 
 customerRouter.post("/register", createCustomer);
 customerRouter.patch("/set-password", setPassword);
@@ -21,11 +23,17 @@ customerRouter.patch(
   customerPhotoUpload.single("customerProfileImage"),
   uploadProfilePicture
 );
-customerRouter.post("/login", loginCustomer);
-customerRouter.post("/forgot-password", sendOtp);
-customerRouter.post("/set-new-password", setNewPassword);
 
-customerRouter.get("/me", authenticateCustomer, getMyProfile);
-customerRouter.patch("/update", authenticateCustomer, updateProfile);
+// common api for customer and worker
+customerOrWorkerRouter.post("/login", loginCustomerOrWorker);
+customerOrWorkerRouter.post("/forgot-password", sendOtp);
+customerOrWorkerRouter.post("/verify-otp", verifyOtp);
+customerOrWorkerRouter.post("/set-new-password", setNewPassword);
+customerOrWorkerRouter.get("/me", customerOrWorkerMiddleware, getMyProfile);
+customerOrWorkerRouter.patch(
+  "/update",
+  customerOrWorkerMiddleware,
+  updateProfile
+);
 
-export default customerRouter;
+export { customerOrWorkerRouter, customerRouter };

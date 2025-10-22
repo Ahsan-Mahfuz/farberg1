@@ -1,6 +1,10 @@
 import express from "express";
 import cors from "cors";
-import customerRouter from "./modules/customer/customer.routes";
+import {
+  customerOrWorkerRouter,
+  customerRouter,
+} from "./modules/customer/customer.routes";
+import workerRouter from "./modules/worker/worker.routes";
 
 const app = express();
 
@@ -24,5 +28,7 @@ app.use(express.json());
 app.use("/picture", express.static("picture"));
 
 app.use("/customer", customerRouter);
+app.use("/customer-or-worker", customerOrWorkerRouter);
+app.use("/worker", workerRouter);
 
 export default app;
