@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { config } from "../config";
 
 interface JwtPayload {
-  customerOrWorkerId: string;
+  id: string;
   email: string;
   role: string;
 }
@@ -30,7 +30,7 @@ export const customerOrWorkerMiddleware = (
     }
 
     (req as any).user = {
-      userId: decoded.customerOrWorkerId,
+      userId: decoded.id,
       email: decoded.email,
       role: decoded.role,
     };

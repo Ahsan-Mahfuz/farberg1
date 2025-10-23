@@ -1,24 +1,17 @@
-import { Schema, Types, model } from 'mongoose'
+import { Document, Schema, Types, model } from "mongoose";
 
-interface IAboutUs {
-  aboutUs?: string | null
-  createdBy: Types.ObjectId
+interface IAboutUs extends Document {
+  aboutUs: string;
 }
 
 const aboutUsSchema = new Schema<IAboutUs>(
   {
     aboutUs: {
       type: String,
-      required: false,
-      default: null,
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
+      default: "About us",
     },
   },
   { timestamps: true }
-)
+);
 
-export const AboutUsModel = model<IAboutUs>('AboutUs', aboutUsSchema)
+export const AboutUsModel = model<IAboutUs>("AboutUs", aboutUsSchema);

@@ -4,17 +4,19 @@ import {
   getTermsAndConditions,
   updatedTermsAndConditions,
 } from "./termsAndConditions.controller";
+import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
-const termsAndConditionsRoutes = express.Router();
+const termsAndConditionsRouter = express.Router();
 
-termsAndConditionsRoutes.patch(
-  "/update-terms-and-conditions",
+termsAndConditionsRouter.patch(
+  "/create-or-update-terms-and-conditions",
+  authenticateAdminOrManager,
   updatedTermsAndConditions
 );
 
-termsAndConditionsRoutes.get(
+termsAndConditionsRouter.get(
   "/get-terms-and-conditions",
   getTermsAndConditions
 );
 
-export default termsAndConditionsRoutes;
+export default termsAndConditionsRouter;

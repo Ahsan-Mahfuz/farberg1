@@ -1,6 +1,4 @@
 import { Request, Response } from "express";
-import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import bcrypt from "bcrypt";
 import { WorkerModel } from "./worker.model";
 import { workerProfileSchema } from "./worker.validation";
@@ -13,9 +11,11 @@ export const registerWorker = async (req: Request, res: Response) => {
     const data = {
       ...req.body,
       uploadPhoto: req.file
-        ? `/picture/workers/${req.file.filename}`
+        ? `/picture/profile_image/${req.file.filename}`
         : undefined,
     };
+
+    console.log(data);
 
     const parsed = workerProfileSchema.safeParse(data);
     if (!parsed.success) {
@@ -35,6 +35,7 @@ export const registerWorker = async (req: Request, res: Response) => {
 
     const worker = new WorkerModel({
       ...parsed.data,
+      uploadPhoto: `http://${process?.env?.HOST}:${process?.env?.PORT}${data.uploadPhoto}`,
       password: hashedPassword,
     });
 

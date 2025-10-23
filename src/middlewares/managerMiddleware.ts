@@ -8,7 +8,7 @@ interface JwtPayload {
   role: string;
 }
 
-export const authenticateAdminOrManager = (
+export const authenticateManager = (
   req: Request,
   res: Response,
   next: NextFunction
@@ -24,8 +24,8 @@ export const authenticateAdminOrManager = (
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, config.jwt_secret) as JwtPayload;
 
-    if (decoded.role !== "admin" && decoded.role !== "manager") {
-      res.status(403).json({ message: "Forbidden: Not an admin or manager" });
+    if (decoded.role !== "manager") {
+      res.status(403).json({ message: "Forbidden: Not a manager" });
       return;
     }
 

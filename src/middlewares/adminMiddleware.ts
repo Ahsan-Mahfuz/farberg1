@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { config } from "../config";
 
 interface JwtPayload {
-  adminId: string;
+  id: string;
   email: string;
   role: string;
 }
@@ -24,13 +24,15 @@ export const authenticateAdmin = (
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, config.jwt_secret) as JwtPayload;
 
-    if (decoded.role !== "admin") {
+    console.log(decoded)
+
+    if (decoded?.role !== "admin") {
       res.status(403).json({ message: "Forbidden: Not an admin" });
       return;
     }
 
     (req as any).user = {
-      userId: decoded.adminId,
+      userId: decoded.id,
       email: decoded.email,
       role: decoded.role,
     };

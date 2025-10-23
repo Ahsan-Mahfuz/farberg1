@@ -1,24 +1,22 @@
-import { Schema, Types, model } from 'mongoose'
+import { Document, Schema, Types, model } from "mongoose";
 
-interface IContactUs {
-  contactUs?: string | null
-  createdBy: Types.ObjectId
+interface IContactUs extends Document {
+  firstName: string;
+  lastName?: string | null;
+  email: string;
+  message: string;
+  isRead: boolean;
 }
 
 const contactUsSchema = new Schema<IContactUs>(
   {
-    contactUs: {
-      type: String,
-      required: false,
-      default: null,
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: false },
+    email: { type: String, required: true },
+    message: { type: String, required: true },
+    isRead: { type: Boolean, default: false },
   },
   { timestamps: true }
-)
+);
 
-export const ContactUsModel = model<IContactUs>('ContactUs', contactUsSchema)
+export const ContactUsModel = model<IContactUs>("ContactUs", contactUsSchema);

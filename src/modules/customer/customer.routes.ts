@@ -11,7 +11,7 @@ import {
   verifyOtp,
 } from "./customer.controller";
 import { customerOrWorkerMiddleware } from "../../middlewares/customerOrWorkerMiddleware";
-import { customerPhotoUpload } from "../../uploads/customerPhotoUpload";
+import { photoUpload } from "../../uploads/profilePhotoUpload";
 
 const customerRouter = express.Router();
 const customerOrWorkerRouter = express.Router();
@@ -20,7 +20,7 @@ customerRouter.post("/register", createCustomer);
 customerRouter.patch("/set-password", setPassword);
 customerRouter.patch(
   "/upload-picture",
-  customerPhotoUpload.single("customerProfileImage"),
+  photoUpload.single("customerProfileImage"),
   uploadProfilePicture
 );
 
@@ -31,8 +31,9 @@ customerOrWorkerRouter.post("/verify-otp", verifyOtp);
 customerOrWorkerRouter.post("/set-new-password", setNewPassword);
 customerOrWorkerRouter.get("/me", customerOrWorkerMiddleware, getMyProfile);
 customerOrWorkerRouter.patch(
-  "/update",
+  "/update-profile",
   customerOrWorkerMiddleware,
+  photoUpload.single("customerProfileImage"),
   updateProfile
 );
 

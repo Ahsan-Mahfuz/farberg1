@@ -5,6 +5,11 @@ import {
   customerRouter,
 } from "./modules/customer/customer.routes";
 import workerRouter from "./modules/worker/worker.routes";
+import managerRouter from "./modules/manager/manager.routes";
+import privacyPolicyRouter from "./modules/privacyPolicy/privacyPolicy.routes";
+import termsAndConditionsRouter from "./modules/termsAndConditions/termsAndConditions.routes";
+import aboutUsRouter from "./modules/aboutUs/aboutUs.routes";
+import contactUsRouter from "./modules/contactUs/contactUs.routes";
 
 const app = express();
 
@@ -30,5 +35,15 @@ app.use("/picture", express.static("picture"));
 app.use("/customer", customerRouter);
 app.use("/customer-or-worker", customerOrWorkerRouter);
 app.use("/worker", workerRouter);
+app.use("/manager", managerRouter);
+
+// common api
+app.use(
+  "/public",
+  privacyPolicyRouter,
+  termsAndConditionsRouter,
+  aboutUsRouter,
+  contactUsRouter
+);
 
 export default app;

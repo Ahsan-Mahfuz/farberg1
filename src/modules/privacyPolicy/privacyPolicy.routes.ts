@@ -4,11 +4,16 @@ import {
   getPrivacyPolicy,
   updatedPrivacyPolicy,
 } from "./privacyPolicy.controller";
+import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
-const privacyPolicyRoutes = express.Router();
+const privacyPolicyRouter = express.Router();
 
-privacyPolicyRoutes.patch("/update-privacy-policy", updatedPrivacyPolicy);
+privacyPolicyRouter.patch(
+  "/create-or-update-privacy-policy",
+  authenticateAdminOrManager,
+  updatedPrivacyPolicy
+);
 
-privacyPolicyRoutes.get("/get-privacy-policy", getPrivacyPolicy);
+privacyPolicyRouter.get("/get-privacy-policy", getPrivacyPolicy);
 
-export default privacyPolicyRoutes;
+export default privacyPolicyRouter;

@@ -91,8 +91,8 @@ export const uploadProfilePicture = async (req: any, res: Response) => {
       return;
     }
 
-    const profileImagePath = `/picture/customer_profile_image/${req.file.filename}`;
-    user.uploadPhoto = profileImagePath;
+    const profileImagePath = `/picture/profile_image/${req.file.filename}`;
+    user.uploadPhoto = `http://${process?.env?.HOST}:${process?.env?.PORT}${profileImagePath}`;
     await user.save();
 
     res.json({
@@ -134,16 +134,15 @@ export const loginCustomerOrWorker = async (
 
     const token = jwt.sign(
       {
-        customer: {
-          firstName: user.firstName,
-          lastName: user.lastName,
-          address: user.address,
-          city: user.city,
-          state: user.state,
-          phone: user.phone,
-          email: user.email,
-          role: user.role,
-        },
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
@@ -172,12 +171,14 @@ export const getMyProfile = async (req: any, res: Response) => {
       return;
     }
 
-    const user = await CustomerModel.findById(userId).select("-password");
+    const user = await CustomerModel.findById(userId).select(
+      "-password -__v -otpVerified -resetOtp -otpExpires"
+    );
     if (!user) {
       res.status(404).json({ message: "Customer not found" });
       return;
     }
-    res.json({ data: user });
+    res.json(user);
   } catch (err) {
     res.status(500).json({ message: "Error fetching profile" });
   }
@@ -192,6 +193,9 @@ export const updateProfile = async (req: any, res: Response) => {
 
     if (role === "worker") {
       const data = workerProfileSchema.partial().parse(req.body);
+
+      delete (data as any).email;
+      delete (data as any).password;
 
       const uploadedPhotoPath = req.file
         ? `/picture/workers/${req.file.filename}`
@@ -358,16 +362,15 @@ export const setNewPassword = async (req: any, res: Response) => {
 
     const token = jwt.sign(
       {
-        customer: {
-          firstName: user.firstName,
-          lastName: user.lastName,
-          address: user.address,
-          city: user.city,
-          state: user.state,
-          phone: user.phone,
-          email: user.email,
-          role: user.role,
-        },
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }

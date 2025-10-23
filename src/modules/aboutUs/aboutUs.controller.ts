@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from 'express'
-import { AboutUsModel } from './aboutUs.model'
+import { Request, Response, NextFunction } from "express";
+import { AboutUsModel } from "./aboutUs.model";
 
 export const updateAboutUs = async (
   req: Request,
@@ -7,25 +7,18 @@ export const updateAboutUs = async (
   next: NextFunction
 ) => {
   try {
-    const userId = (req as any).user?.userId
-    if (!userId) {
-      res.status(401).json({ message: 'Unauthorized Access' })
-      return
-    }
-
-    const updatedAboutUs = await AboutUsModel.findOneAndUpdate(
-      { createdBy: userId },
+    await AboutUsModel.findOneAndUpdate(
+      {},
       { $set: { aboutUs: req.body.aboutUs } },
       { new: true, upsert: true }
-    )
-
+    );
     res.status(200).json({
-      message: 'About us updated successfully',
-    })
+      message: "About us updated successfully",
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
 export const getAboutUs = async (
   req: Request,
@@ -33,15 +26,13 @@ export const getAboutUs = async (
   next: NextFunction
 ) => {
   try {
-    const userId = (req as any).user?.userId
-
-    const aboutUsData = await AboutUsModel.findOne({ createdBy: userId })
+    const aboutUsData = await AboutUsModel.findOne();
 
     res.status(200).json({
-      message: 'About us fetched successfully',
+      message: "About us fetched successfully",
       aboutUs: aboutUsData?.aboutUs,
-    })
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};

@@ -1,11 +1,16 @@
 import express from "express";
 
 import { getAboutUs, updateAboutUs } from "./aboutUs.controller";
+import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
-const aboutUsRoutes = express.Router();
+const aboutUsRouter = express.Router();
 
-aboutUsRoutes.patch("/update-about-us", updateAboutUs);
+aboutUsRouter.patch(
+  "/create-or-update-about-us",
+  authenticateAdminOrManager,
+  updateAboutUs
+);
 
-aboutUsRoutes.get("/get-about-us", getAboutUs);
+aboutUsRouter.get("/get-about-us", getAboutUs);
 
-export default aboutUsRoutes;
+export default aboutUsRouter;

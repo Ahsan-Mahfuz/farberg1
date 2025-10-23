@@ -4,7 +4,7 @@ import fs from "fs";
 
 const uploadFolder = path.join(
   __dirname,
-  "../../picture/customer_profile_image"
+  "../../picture/profile_image"
 );
 
 if (!fs.existsSync(uploadFolder)) {
@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
   },
 });
 
-export const customerPhotoUpload = multer({
+export const photoUpload = multer({
   storage,
   fileFilter: function (req, file, cb) {
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];

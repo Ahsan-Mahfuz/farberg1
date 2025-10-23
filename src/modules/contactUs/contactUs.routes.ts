@@ -1,11 +1,33 @@
 import express from "express";
 
-import { getContactUs, updateContactUs } from "./contactUs.controller";
+import {
+  createContactUs,
+  getContactUs,
+  getContactUsById,
+  updateStatusContactUsById,
+} from "./contactUs.controller";
+import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
-const contactUsRoutes = express.Router();
+const contactUsRouter = express.Router();
 
-contactUsRoutes.patch("/update-contact-us", updateContactUs);
+contactUsRouter.post("/create-contact-us", createContactUs);
 
-contactUsRoutes.get("/get-contact-us", getContactUs);
+contactUsRouter.get(
+  "/get-contact-us",
+  authenticateAdminOrManager,
+  getContactUs
+);
 
-export default contactUsRoutes;
+contactUsRouter.get(
+  "/get-one-contact-us/:id",
+  authenticateAdminOrManager,
+  getContactUsById
+);
+
+contactUsRouter.get(
+  "/update-status-contact-us/:id",
+  authenticateAdminOrManager,
+  updateStatusContactUsById
+);
+
+export default contactUsRouter;

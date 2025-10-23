@@ -10,6 +10,7 @@ export const workerProfileSchema = z.object({
   phone: z.string(),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  workerId: z.string().min(1, "Worker ID is required"),
 });
 
 export type WorkerProfileInput = z.infer<typeof workerProfileSchema>;
