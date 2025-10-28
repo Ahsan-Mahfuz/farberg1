@@ -1,4 +1,5 @@
 import { Schema, model, Document, Types } from "mongoose";
+import { IAccessibility } from "../accessibility/accessibility.model";
 
 export interface IManager extends Document {
   firstName: string;
@@ -16,6 +17,7 @@ export interface IManager extends Document {
   otpExpires?: Date | null;
   otpVerified?: boolean;
   role: string;
+  accessibility?: Types.ObjectId | IAccessibility;
 }
 
 const managerSchema = new Schema<IManager>(
@@ -35,6 +37,11 @@ const managerSchema = new Schema<IManager>(
     otpExpires: { type: Date, default: null },
     otpVerified: { type: Boolean, default: false },
     role: { type: String, default: "manager" },
+    accessibility: {
+      type: Schema.Types.ObjectId,
+      ref: "Accessibility",
+      default: null,
+    },
   },
   { timestamps: true }
 );

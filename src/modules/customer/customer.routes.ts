@@ -10,8 +10,8 @@ import {
   uploadProfilePicture,
   verifyOtp,
 } from "./customer.controller";
-import { customerOrWorkerMiddleware } from "../../middlewares/customerOrWorkerMiddleware";
 import { photoUpload } from "../../uploads/profilePhotoUpload";
+import { customerOrWorkerMiddleware } from "../../middlewares/customerOrWorkerMiddleware";
 
 const customerRouter = express.Router();
 const customerOrWorkerRouter = express.Router();

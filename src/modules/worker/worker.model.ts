@@ -1,4 +1,5 @@
 import { Schema, model, Document, Types } from "mongoose";
+import { IService } from "../services/services.model";
 
 export interface IWorker extends Document {
   firstName: string;
@@ -16,6 +17,10 @@ export interface IWorker extends Document {
   otpExpires?: Date | null;
   otpVerified?: boolean;
   role: string;
+  services: {
+    service: Types.ObjectId | IService;
+    subcategories?: Types.ObjectId[];
+  }[];
 }
 
 const workerSchema = new Schema<IWorker>(
@@ -35,6 +40,20 @@ const workerSchema = new Schema<IWorker>(
     otpExpires: { type: Date, default: null },
     otpVerified: { type: Boolean, default: false },
     role: { type: String, default: "worker" },
+    services: [
+      {
+        service: {
+          type: Schema.Types.ObjectId,
+          ref: "Service",
+          required: true,
+        },
+        subcategories: [
+          {
+            type: Schema.Types.ObjectId,
+          },
+        ],
+      },
+    ],
   },
   { timestamps: true }
 );

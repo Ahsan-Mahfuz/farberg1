@@ -190,26 +190,43 @@ export const getMyProfile = async (req: any, res: Response) => {
 export const updateProfile = async (req: any, res: Response) => {
   try {
     const { userId, role } = req.user;
+    let data = req.body;
 
+    if (data.services && typeof data.services === "string") {
+      try {
+        data.services = JSON.parse(data.services);
+      } catch {
+        res.status(400).json({ message: "Invalid JSON in services field" });
+        return;
+      }
+    }
+
+    const uploadedPhotoPath = req.file
+      ? `/picture/profile_image/${req.file.filename}`
+      : undefined;
+
+    //  WORKER SECTION
     if (role === "worker") {
-      const data = workerProfileSchema.partial().parse(req.body);
+      const parsed = workerProfileSchema.partial().safeParse(data);
+      if (!parsed.success) {
+        res.status(400).json({ message: parsed.error.errors });
+        return;
+      }
 
-      delete (data as any).email;
-      delete (data as any).password;
-
-      const uploadedPhotoPath = req.file
-        ? `/picture/workers/${req.file.filename}`
-        : undefined;
+      delete (parsed.data as any).email;
+      delete (parsed.data as any).password;
 
       const updateData = {
-        ...data,
+        ...parsed.data,
         ...(uploadedPhotoPath ? { uploadPhoto: uploadedPhotoPath } : {}),
       };
 
       const updatedWorker = await WorkerModel.findByIdAndUpdate(
         userId,
         updateData,
-        { new: true }
+        {
+          new: true,
+        }
       ).select("-password");
 
       if (!updatedWorker) {
@@ -218,21 +235,21 @@ export const updateProfile = async (req: any, res: Response) => {
       }
 
       res.json({
-        message: "Profile updated successfully",
+        message: "Worker profile updated successfully",
         data: updatedWorker,
       });
       return;
     }
 
-    // If not worker, then customer
-    const data = customerProfileSchema.partial().parse(req.body);
-
-    const uploadedPhotoPath = req.file
-      ? `/picture/customers/${req.file.filename}`
-      : undefined;
+    // CUSTOMER SECTION
+    const parsed = customerProfileSchema.partial().safeParse(data);
+    if (!parsed.success) {
+      res.status(400).json({ message: parsed.error.errors });
+      return;
+    }
 
     const updateData = {
-      ...data,
+      ...parsed.data,
       ...(uploadedPhotoPath ? { uploadPhoto: uploadedPhotoPath } : {}),
     };
 
@@ -248,14 +265,15 @@ export const updateProfile = async (req: any, res: Response) => {
     }
 
     res.json({
-      message: "Profile updated successfully",
+      message: "Customer profile updated successfully",
       data: updatedCustomer,
     });
   } catch (err: any) {
-    console.error(err);
-    res.status(400).json({
+    res.status(500).json({
       message: err.errors?.[0]?.message || "Error updating profile",
+      error: err.message,
     });
+    return;
   }
 };
 

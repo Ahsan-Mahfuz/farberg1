@@ -22,18 +22,15 @@ export const seedAdmin = async () => {
   const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
   const adminManager = new ManagerModel({
-    firstName: "Ahsan",
-    lastName: "Mahfuz",
-    address: "Dhaka",
-    city: "Dhaka",
-    state: "Bangladesh",
-    phone: "0000000000",
+    firstName: process.env.ADMIN_FIRST_NAME,
+    lastName: process.env.ADMIN_LAST_NAME,
+    address: process.env.ADMIN_ADDRESS,
+    city: process.env.ADMIN_CITY,
+    state: process.env.ADMIN_STATE,
+    phone: process.env.ADMIN_PHONE,
     email: ADMIN_EMAIL,
     password: hashedPassword,
     role: "admin",
-    isBlocked: false,
-    managerId: null,
-    uploadPhoto: null,
   });
 
   await adminManager.save();

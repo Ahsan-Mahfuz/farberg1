@@ -4,9 +4,28 @@ import { ManagerModel } from "./manager.model";
 import { managerLoginSchema, managerProfileSchema } from "./manager.validation";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
+import { AccessibilityModel } from "../accessibility/accessibility.model";
 
 // --------------------
-// Register Worker
+// Seed Default Accessibility
+// --------------------
+const seedDefaultAccessibility = async () => {
+  let accessibility = await AccessibilityModel.findOne();
+  if (!accessibility) {
+    accessibility = await AccessibilityModel.create({
+      isDashboardShow: false,
+      isAnalyticsShow: false,
+      isUsersShow: false,
+      isServicesShow: false,
+      isTransactionsShow: false,
+    });
+  }
+  ManagerModel.schema.path("accessibility").default(accessibility._id);
+};
+seedDefaultAccessibility();
+
+// --------------------
+// Register Manager
 // --------------------
 export const registerManager = async (req: Request, res: Response) => {
   try {
@@ -33,8 +52,11 @@ export const registerManager = async (req: Request, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const accessibility = await AccessibilityModel.create({});
+
     const manager = new ManagerModel({
       ...parsed.data,
+      accessibility: accessibility._id,
       uploadPhoto: `http://${process?.env?.HOST}:${process?.env?.PORT}${data.uploadPhoto}`,
       password: hashedPassword,
     });
@@ -61,7 +83,9 @@ export const loginManger = async (
   try {
     const { email, password } = managerLoginSchema.parse(req.body);
 
-    const user = await ManagerModel.findOne({ email });
+    const user = await ManagerModel.findOne({ email }).populate(
+      "accessibility"
+    );
     if (!user || !user.password) {
       res.status(400).json({ message: "Invalid credentials" });
       return;
@@ -85,6 +109,7 @@ export const loginManger = async (
         role: user.role,
         managerId: user.managerId,
         uploadPhoto: user.uploadPhoto,
+        accessibility: user.accessibility,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }

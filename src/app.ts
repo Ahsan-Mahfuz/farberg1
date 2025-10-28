@@ -10,6 +10,12 @@ import privacyPolicyRouter from "./modules/privacyPolicy/privacyPolicy.routes";
 import termsAndConditionsRouter from "./modules/termsAndConditions/termsAndConditions.routes";
 import aboutUsRouter from "./modules/aboutUs/aboutUs.routes";
 import contactUsRouter from "./modules/contactUs/contactUs.routes";
+import serviceRouter from "./modules/services/services.routes";
+import stateRouter from "./modules/state/state.routes";
+import accessibilityRouter from "./modules/accessibility/accessibility.routes";
+import timeSlotRouter from "./modules/timeSlot/timeSlot.routes";
+import bookingRouter from "./modules/booking/booking.routes";
+import uploadPhotoRouter from "./modules/uploadPhoto/uploadPhoto.routes";
 
 const app = express();
 
@@ -36,6 +42,12 @@ app.use("/customer", customerRouter);
 app.use("/customer-or-worker", customerOrWorkerRouter);
 app.use("/worker", workerRouter);
 app.use("/manager", managerRouter);
+app.use("/service", serviceRouter);
+app.use("/state", stateRouter);
+app.use("/accessibility", accessibilityRouter);
+app.use("/time-slot", timeSlotRouter);
+app.use("/booking", bookingRouter);
+app.use("/photo", uploadPhotoRouter);
 
 // common api
 app.use(
