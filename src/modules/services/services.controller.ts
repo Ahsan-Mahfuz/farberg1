@@ -163,3 +163,65 @@ export const deleteService = async (req: Request, res: Response) => {
     });
   }
 };
+
+// --------------------
+//   Service Popularity
+// --------------------
+export const getServicePopularity = async (req: Request, res: Response) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const month = Number(req.query.month); 
+
+    const match: any = {
+      bookedAt: {
+        $gte: new Date(year, month ? month - 1 : 0, 1),
+        $lte: new Date(
+          year,
+          month ? month : 11,
+          month ? new Date(year, month, 0).getDate() : 31,
+          23,
+          59,
+          59
+        ),
+      },
+    };
+
+    const result = await ServiceModel.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$serviceId",
+          totalBookings: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "services",
+          localField: "_id",
+          foreignField: "_id",
+          as: "service",
+        },
+      },
+      { $unwind: "$service" },
+      {
+        $project: {
+          _id: 0,
+          serviceName: "$service.serviceName",
+          totalBookings: 1,
+        },
+      },
+      { $sort: { totalBookings: -1 } },
+    ]);
+
+    res.status(200).json({
+      message: "Service popularity retrieved successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Error fetching service popularity:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};

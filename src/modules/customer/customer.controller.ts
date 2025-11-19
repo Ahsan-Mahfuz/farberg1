@@ -12,6 +12,7 @@ import {
 import findUserByEmail from "../../utils/checkCustomerOrWorker";
 import { WorkerModel } from "../worker/worker.model";
 import { workerProfileSchema } from "../worker/worker.validation";
+import { paginate } from "../../helper/paginationHelper";
 
 // --------------------
 // Register Customer
@@ -398,5 +399,49 @@ export const setNewPassword = async (req: any, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error resetting password" });
+  }
+};
+
+// --------------------
+// Get All Customers
+// --------------------
+
+export const getAllCustomers = async (req: Request, res: Response) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const sortField = String(req.query.sortField || "createdAt");
+    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+
+    const filter: Record<string, any> = { role: "customer" };
+
+    if (req.query.search) {
+      const search = String(req.query.search);
+      filter.$or = [
+        { firstName: { $regex: search, $options: "i" } },
+        { lastName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const result = await paginate(CustomerModel, {
+      page,
+      limit,
+      sort: { [sortField]: sortOrder },
+      filter,
+    });
+
+    res.status(200).json({
+      message: "Customers retrieved successfully",
+      data: result.data,
+      pagination: result.pagination,
+    });
+  } catch (error: any) {
+    console.error("Error fetching customers:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };

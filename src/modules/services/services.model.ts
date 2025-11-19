@@ -8,7 +8,7 @@ export interface ISubcategory {
 
 export interface IService extends Document {
   serviceName: string;
-  price: string;
+  price: number;
   subcategory?: ISubcategory[];
 }
 
@@ -20,7 +20,7 @@ const subcategorySchema = new Schema<ISubcategory>({
 const serviceSchema = new Schema<IService>(
   {
     serviceName: { type: String, required: true },
-    price: { type: String, required: true },
+    price: { type: Number, required: true },
     subcategory: { type: [subcategorySchema], required: false },
   },
   { timestamps: true }

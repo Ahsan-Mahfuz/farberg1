@@ -7,13 +7,13 @@ export const subcategorySchema = z.object({
 
 export const createServiceValidation = z.object({
   serviceName: z.string().min(1, "Service name is required"),
-  price: z.string().min(1, "Price is required"),
+  price: z.number().min(1, "Price is required"),
   subcategory: z.array(subcategorySchema).optional(),
 });
 
 export const updateServiceValidation = z.object({
   serviceName: z.string().optional(),
-  price: z.string().optional(),
+  price: z.number().optional(),
   subcategory: z.array(subcategorySchema).optional(),
 });
 

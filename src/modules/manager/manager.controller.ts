@@ -166,7 +166,7 @@ export const updateProfile = async (req: any, res: Response) => {
     delete (data as any).password;
 
     const uploadedPhotoPath = req.file
-      ? `/picture/managers/${req.file.filename}`
+      ? `/picture/profile_image/${req.file.filename}`
       : undefined;
 
     const updateData = {

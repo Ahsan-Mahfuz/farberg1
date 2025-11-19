@@ -5,6 +5,7 @@ import {
   deleteService,
   getAllServices,
   getServiceById,
+  getServicePopularity,
 } from "./services.controller";
 import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
@@ -26,6 +27,11 @@ serviceRouter.delete(
   "/delete-service/:id",
   authenticateAdminOrManager,
   deleteService
+);
+serviceRouter.get(
+  "/popularity",
+  authenticateAdminOrManager,
+  getServicePopularity
 );
 
 export default serviceRouter;

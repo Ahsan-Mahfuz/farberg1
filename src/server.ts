@@ -10,7 +10,7 @@ connectDB().then(async () => {
   const HOST = config.host;
 
   app.get("/", (_req, res) => {
-    res.send("Staff reporting server is running perfectly!");
+    res.send("Farberge server is running perfectly!");
   });
 
   app.listen(PORT, () => {

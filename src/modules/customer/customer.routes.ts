@@ -9,9 +9,11 @@ import {
   setPassword,
   uploadProfilePicture,
   verifyOtp,
+  getAllCustomers,
 } from "./customer.controller";
 import { photoUpload } from "../../uploads/profilePhotoUpload";
 import { customerOrWorkerMiddleware } from "../../middlewares/customerOrWorkerMiddleware";
+import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
 const customerRouter = express.Router();
 const customerOrWorkerRouter = express.Router();
@@ -22,6 +24,11 @@ customerRouter.patch(
   "/upload-picture",
   photoUpload.single("customerProfileImage"),
   uploadProfilePicture
+);
+customerRouter.get(
+  "/get-all-customers",
+  authenticateAdminOrManager,
+  getAllCustomers
 );
 
 // common api for customer and worker
