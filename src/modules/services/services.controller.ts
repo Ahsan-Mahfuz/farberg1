@@ -170,7 +170,7 @@ export const deleteService = async (req: Request, res: Response) => {
 export const getServicePopularity = async (req: Request, res: Response) => {
   try {
     const year = Number(req.query.year) || new Date().getFullYear();
-    const month = Number(req.query.month); 
+    const month = Number(req.query.month);
 
     const match: any = {
       bookedAt: {

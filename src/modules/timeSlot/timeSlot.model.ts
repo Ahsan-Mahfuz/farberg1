@@ -7,6 +7,8 @@ const slotSchema = new Schema(
     isAvailable: { type: Boolean, default: true },
     isBooked: { type: Boolean, default: false },
     isBlocked: { type: Boolean, default: false },
+    heldBy: { type: Schema.Types.ObjectId, ref: "Booking", default: null },
+    heldUntil: { type: Date, default: null },
   },
   { _id: true }
 );
@@ -17,6 +19,8 @@ export interface ISlot extends Document {
   isAvailable: boolean;
   isBooked: boolean;
   isBlocked: boolean;
+  heldBy: Types.ObjectId | null;
+  heldUntil: Date | null;
 }
 
 export interface ITimeSlot extends Document {

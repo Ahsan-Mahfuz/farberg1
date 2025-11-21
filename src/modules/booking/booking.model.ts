@@ -12,7 +12,10 @@ export interface IBooking extends Document {
   date: Date;
   startTime: string;
   endTime: string;
-  status: "booked" | "completed" | "cancelled";
+  status: "booked" | "completed" | "cancelled" | "expired" | "pending";
+  isPayment: { type: Boolean; default: false };
+  transactionId: { type: String; default: null };
+  paymentExpiresAt: Date | null;
 }
 
 const bookingSchema = new Schema<IBooking>(
@@ -34,11 +37,16 @@ const bookingSchema = new Schema<IBooking>(
     endTime: { type: String, required: true },
     status: {
       type: String,
-      enum: ["booked", "completed", "cancelled"],
+      enum: ["booked", "completed", "cancelled", "expired", "pending"],
       default: "booked",
     },
+    isPayment: { type: Boolean, default: false },
+    transactionId: { type: String, default: null },
+    paymentExpiresAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
+
+bookingSchema.index({ paymentExpiresAt: 1, status: 1 });
 
 export const BookingModel = model<IBooking>("Booking", bookingSchema);

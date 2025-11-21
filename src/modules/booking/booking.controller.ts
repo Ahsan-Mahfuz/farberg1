@@ -5,9 +5,281 @@ import { CustomerModel } from "../customer/customer.model";
 import { WorkerModel } from "../worker/worker.model";
 import { ServiceModel } from "../services/services.model";
 import generateDefaultSlots from "../timeSlot/timeSlot.controller";
+import { paginate } from "../../helper/paginationHelper";
+import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+// --------------------
+// Payment Method
+// --------------------
+
+const calculateTotalPrice = async (booking: any) => {
+  let total = 0;
+
+  for (const srv of booking.services) {
+    const serviceDoc = await ServiceModel.findById(srv.service);
+    if (!serviceDoc) {
+      console.warn(`Service ${srv.service} not found`);
+      continue;
+    }
+
+    // Add base service price
+    total += serviceDoc.price;
+
+    // Add subcategory prices if they exist
+    if (srv.subcategories && srv.subcategories.length > 0) {
+      for (const subId of srv.subcategories) {
+        const sub = serviceDoc.subcategory?.find(
+          (s: any) => s._id.toString() === subId.toString()
+        );
+        if (sub) {
+          total += sub.subcategoryPrice; // ← Changed from sub.price
+        }
+      }
+    }
+  }
+
+  return total;
+};
+export const initializePayment = async (req: any, res: Response) => {
+  try {
+    const { bookingId } = req.body;
+    const customerId = req.user.userId;
+    const currency = "usd";
+    const success_url = "http://10.10.20.16:5137/success";
+    const cancel_url = "http://10.10.20.16:5137/cancel";
+
+    const customer = await CustomerModel.findById(customerId);
+    if (!customer) {
+      res.status(404).json({ message: "Customer not found" });
+      return;
+    }
+
+    const booking = await BookingModel.findById(bookingId);
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+
+    const workerId = booking.worker;
+
+    const worker = await WorkerModel.findById(workerId);
+    if (!worker) {
+      res.status(404).json({ message: "Worker not found" });
+      return;
+    }
+
+    const amount = await calculateTotalPrice(booking);
+
+    const metadata = {
+      bookingId: booking._id.toString(),
+      customerId: customerId.toString(),
+      workerId: workerId.toString(),
+    };
+
+    const session = await stripe.checkout.sessions.create({
+      customer_email: customer.email,
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency,
+            product_data: { name: "Total Price" },
+            unit_amount: amount * 100,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata,
+      success_url,
+      cancel_url,
+    });
+    res.json({ url: session?.url, totalAmount: amount });
+  } catch (err: any) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ message: "Error initializing payment", error: err.message });
+  }
+};
+
+export const handleStripeWebhook = async (req: Request, res: Response) => {
+  const sig = req.headers["stripe-signature"] as string;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err: any) {
+    console.error("Webhook signature verification failed:", err.message);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+    return;
+  }
+
+  switch (event.type) {
+    case "checkout.session.completed":
+      const session = event.data.object as Stripe.Checkout.Session;
+      await handleSuccessfulPayment(session);
+      break;
+
+    case "checkout.session.async_payment_succeeded":
+      const asyncSession = event.data.object as Stripe.Checkout.Session;
+      await handleSuccessfulPayment(asyncSession);
+      break;
+
+    case "checkout.session.async_payment_failed":
+      const failedSession = event.data.object as Stripe.Checkout.Session;
+      await handleFailedPayment(failedSession);
+      break;
+
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+
+  res.json({ received: true });
+};
+
+const handleSuccessfulPayment = async (session: Stripe.Checkout.Session) => {
+  try {
+    const { bookingId, customerId, workerId } = session.metadata || {};
+
+    if (!bookingId) {
+      console.error("❌ No bookingId in webhook metadata");
+      return;
+    }
+
+    console.log("✅ Payment successful for booking:", bookingId);
+
+    // Update booking to confirmed status
+    const booking = await BookingModel.findByIdAndUpdate(
+      bookingId,
+      {
+        isPayment: true,
+        transactionId: session.payment_intent as string,
+        status: "booked", // Change from "pending" to "booked"
+        paymentExpiresAt: null, // Clear expiration
+      },
+      { new: true }
+    );
+
+    if (!booking) {
+      console.error("❌ Booking not found:", bookingId);
+      return;
+    }
+
+    // Confirm the slot booking
+    const timeSlotDoc = await TimeSlotModel.findOne({
+      worker: booking.worker,
+      date: booking.date,
+    });
+
+    if (timeSlotDoc) {
+      const slot = timeSlotDoc.slots.find(
+        (s) => s.startTime === booking.startTime
+      );
+
+      if (slot) {
+        slot.isBooked = true; // Now permanently booked
+        slot.isAvailable = false;
+        slot.heldBy = null;
+        slot.heldUntil = null;
+        await timeSlotDoc.save();
+      }
+    }
+
+    console.log("✅ Booking confirmed:", {
+      bookingId: booking._id,
+      isPayment: booking.isPayment,
+      transactionId: booking.transactionId,
+      status: booking.status,
+    });
+  } catch (error: any) {
+    console.error("❌ Error handling successful payment:", error.message);
+  }
+};
+
+export const cleanupExpiredBookings = async () => {
+  try {
+    const now = new Date();
+
+    // Find all expired pending bookings
+    const expiredBookings = await BookingModel.find({
+      status: "pending",
+      isPayment: false,
+      paymentExpiresAt: { $lte: now },
+    });
+
+    console.log(`🧹 Cleaning up ${expiredBookings.length} expired bookings`);
+
+    for (const booking of expiredBookings) {
+      // Update booking status to expired
+      booking.status = "expired";
+      await booking.save();
+
+      // Release the time slot
+      const timeSlotDoc = await TimeSlotModel.findOne({
+        worker: booking.worker,
+        date: booking.date,
+      });
+
+      if (timeSlotDoc) {
+        const slotIndex = timeSlotDoc.slots.findIndex(
+          (s) => s.startTime === booking.startTime
+        );
+
+        if (slotIndex !== -1) {
+          const slot = timeSlotDoc.slots[slotIndex];
+
+          // Release the slot
+          slot.isAvailable = true;
+          slot.isBooked = false;
+          slot.heldBy = null;
+          slot.heldUntil = null;
+
+          // Unblock adjacent slots
+          const prevSlot = timeSlotDoc.slots[slotIndex - 1];
+          const nextSlot = timeSlotDoc.slots[slotIndex + 1];
+
+          if (prevSlot) prevSlot.isBlocked = false;
+          if (nextSlot) nextSlot.isBlocked = false;
+
+          await timeSlotDoc.save();
+
+          console.log(`✅ Released slot for booking: ${booking._id}`);
+        }
+      }
+    }
+
+    console.log(
+      `✅ Cleanup completed: ${expiredBookings.length} bookings expired`
+    );
+  } catch (error: any) {
+    console.error("❌ Error cleaning up expired bookings:", error.message);
+  }
+};
+
+// Run cleanup every minute
+export const startCleanupScheduler = () => {
+  setInterval(cleanupExpiredBookings, 60 * 1000); // Every 1 minute
+  console.log("🔄 Cleanup scheduler started");
+};
+
+const handleFailedPayment = async (session: Stripe.Checkout.Session) => {
+  try {
+    const { bookingId } = session.metadata!;
+    console.log("❌ Payment failed for booking:", bookingId);
+  } catch (error: any) {
+    console.error("Error handling failed payment:", error.message);
+  }
+};
 
 // --------------------
 // Booking Slot By Customer
+// --------------------
+// --------------------
+// Booking Slot By Customer with Payment Hold
 // --------------------
 export const bookTimeSlot = async (req: any, res: Response) => {
   try {
@@ -49,23 +321,6 @@ export const bookTimeSlot = async (req: any, res: Response) => {
         });
         return;
       }
-
-      // if (srv.serviceCategories && srv.serviceCategories.length > 0) {
-      //   const serviceDoc = await ServiceModel.findById(srv.serviceId);
-      //   const allowedCategories =
-      //     serviceDoc?.subcategory?.map((sub: any) => sub.toString()) || [];
-
-      //   const invalidCategories = srv.serviceCategories.filter(
-      //     (sub: any) => !allowedCategories.includes(sub)
-      //   );
-
-      //   // if (invalidCategories.length > 0) {
-      //   //   return res.status(400).json({
-      //   //     message: `Invalid subcategories for service ${srv.serviceId}`,
-      //   //     invalidCategories,
-      //   //   });
-      //   // }
-      // }
     }
 
     let timeSlotDoc = await TimeSlotModel.findOne({ worker: workerId, date });
@@ -75,7 +330,6 @@ export const bookTimeSlot = async (req: any, res: Response) => {
         date,
         slots: generateDefaultSlots(),
       });
-
       await timeSlotDoc.save();
     }
 
@@ -93,20 +347,79 @@ export const bookTimeSlot = async (req: any, res: Response) => {
     }
 
     const slot = timeSlotDoc.slots[slotIndex];
+    const now = new Date();
+
+    if (slot.heldUntil && now >= slot.heldUntil && !slot.isBooked) {
+      console.log(`🔓 Releasing expired hold on slot ${startTime}`);
+
+      slot.isAvailable = true;
+      slot.heldBy = null;
+      slot.heldUntil = null;
+
+      const prevSlot = timeSlotDoc.slots[slotIndex - 1];
+      const nextSlot = timeSlotDoc.slots[slotIndex + 1];
+
+      if (prevSlot && prevSlot.isBlocked) prevSlot.isBlocked = false;
+      if (nextSlot && nextSlot.isBlocked) nextSlot.isBlocked = false;
+
+      await timeSlotDoc.save();
+
+      if (slot.heldBy) {
+        await BookingModel.findByIdAndUpdate(slot.heldBy, {
+          status: "expired",
+        });
+      }
+    }
+
+    if (slot.heldUntil && now < slot.heldUntil) {
+      const remainingMinutes = Math.ceil(
+        (slot.heldUntil.getTime() - now.getTime()) / (1000 * 60)
+      );
+
+      res.status(400).json({
+        message: `Slot is temporarily held by another customer. Available in ${remainingMinutes} minute(s).`,
+        availableAt: slot.heldUntil,
+      });
+      return;
+    }
+
+    if (slot.isBooked) {
+      res.status(400).json({ message: "Slot is already booked" });
+      return;
+    }
 
     if (slot.isBlocked) {
       res.status(400).json({ message: "Slot is blocked" });
       return;
     }
 
-    if (!slot.isAvailable || slot.isBooked) {
+    if (!slot.isAvailable) {
       res.status(400).json({ message: "Slot is not available" });
       return;
     }
 
-    slot.isBooked = true;
+    const formattedServices = services.map((srv: any) => ({
+      service: srv.serviceId,
+      subcategories: srv.serviceCategories || [],
+    }));
+
+    const paymentExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    const booking = await BookingModel.create({
+      customer: customerId,
+      worker: workerId,
+      services: formattedServices,
+      date,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      status: "pending",
+      isPayment: false,
+      paymentExpiresAt,
+    });
+
     slot.isAvailable = false;
-    slot.isBlocked = false;
+    slot.heldBy = booking._id;
+    slot.heldUntil = paymentExpiresAt;
 
     const prevSlot = timeSlotDoc.slots[slotIndex - 1];
     const nextSlot = timeSlotDoc.slots[slotIndex + 1];
@@ -116,24 +429,14 @@ export const bookTimeSlot = async (req: any, res: Response) => {
 
     await timeSlotDoc.save();
 
-    const formattedServices = services.map((srv: any) => ({
-      service: srv.serviceId,
-      subcategories: srv.serviceCategories || [],
-    }));
-
-    const booking = await BookingModel.create({
-      customer: customerId,
-      worker: workerId,
-      services: formattedServices,
-      date,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      status: "booked",
-    });
+    console.log(`✅ Slot temporarily reserved until: ${paymentExpiresAt}`);
 
     res.status(201).json({
-      message: "Slot booked successfully",
+      message:
+        "Slot temporarily reserved. Please complete payment within 10 minutes.",
       data: booking,
+      expiresAt: paymentExpiresAt,
+      expiresInMinutes: 10,
     });
   } catch (err: any) {
     console.error(err);
@@ -145,7 +448,7 @@ export const bookTimeSlot = async (req: any, res: Response) => {
 };
 
 // --------------------
-// Get Worker Bookings
+// Get One Worker Bookings Information
 // --------------------
 export const getWorkerBookings = async (req: any, res: Response) => {
   try {
@@ -163,25 +466,36 @@ export const getWorkerBookings = async (req: any, res: Response) => {
 
     const month = parseInt(req.query.month);
     const year = parseInt(req.query.year);
+    const date = req.query.date;
     const status = req.query.status; // optional: "booked" | "completed" | "cancelled"
     const filterType = req.query.filter; // optional: "upcoming" | "completed"
 
-    // Query base
+    console.log(date);
+
     const query: any = { worker: workerId };
 
-    // Month + year filtering (1–30/31 days)
-    if (month && year) {
+    if (date) {
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+      query.date = { $gte: startOfDay, $lte: endOfDay };
+    } else if (month && year) {
       const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0, 23, 59, 59); // last day of month
+      const endDate = new Date(year, month, 0, 23, 59, 59);
       query.date = { $gte: startDate, $lte: endDate };
+    } else if (filterType) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (filterType === "upcoming") {
+        query.date = { $gte: today };
+      } else if (filterType === "completed") {
+        query.date = { $lt: today };
+      }
     }
-
-    // Filter by status (booked, completed, cancelled)
     if (status) {
       query.status = status;
     }
 
-    // Date-based filter
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (filterType === "upcoming") {
@@ -190,7 +504,6 @@ export const getWorkerBookings = async (req: any, res: Response) => {
       query.date = { ...query.date, $lt: today };
     }
 
-    // Count + Data
     const total = await BookingModel.countDocuments(query);
     const bookings = await BookingModel.find(query)
       .populate({
@@ -199,13 +512,12 @@ export const getWorkerBookings = async (req: any, res: Response) => {
       })
       .populate({
         path: "services.service",
-        select: "name price",
+        select: "serviceName price subcategory",
       })
       .sort({ date: 1, startTime: 1 })
       .skip(skip)
       .limit(limit);
 
-    // Group bookings by date (optional)
     const groupedByDate = bookings.reduce((acc: any, booking: any) => {
       const day = booking.date.toISOString().split("T")[0];
       if (!acc[day]) acc[day] = [];
@@ -217,7 +529,7 @@ export const getWorkerBookings = async (req: any, res: Response) => {
       message: "Worker bookings fetched successfully",
       month,
       year,
-      data: groupedByDate, // or use bookings if you don't want grouping
+      data: groupedByDate,
       pagination: {
         total: total,
         page,
@@ -229,6 +541,113 @@ export const getWorkerBookings = async (req: any, res: Response) => {
     console.error("Error fetching worker bookings:", err);
     res.status(500).json({
       message: "Error fetching worker bookings",
+      error: err.message,
+    });
+  }
+};
+
+// --------------------
+// Get Worker Monthly Calendar
+// --------------------
+export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
+  try {
+    const workerId = req.user.userId;
+
+    const worker = await WorkerModel.findById(workerId);
+    if (!worker) {
+      res.status(404).json({ message: "Worker not found" });
+      return;
+    }
+
+    const year = parseInt(req.query.year);
+    const month = parseInt(req.query.month);
+
+    if (!year || !month || month < 1 || month > 12) {
+      res.status(400).json({ message: "Valid year and month are required" });
+      return;
+    }
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    const timeSlots = await TimeSlotModel.find({
+      worker: workerId,
+      date: { $gte: startDate, $lte: endDate },
+    });
+
+    const bookings = await BookingModel.find({
+      worker: workerId,
+      date: { $gte: startDate, $lte: endDate },
+    });
+
+    const timeSlotMap = new Map();
+    const bookingCountMap = new Map();
+
+    timeSlots.forEach((slot) => {
+      const dateKey = slot.date.toISOString().split("T")[0];
+      timeSlotMap.set(dateKey, slot);
+    });
+
+    bookings.forEach((booking) => {
+      const dateKey = booking.date.toISOString().split("T")[0];
+      bookingCountMap.set(dateKey, (bookingCountMap.get(dateKey) || 0) + 1);
+    });
+
+    const calendarData = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month - 1, day);
+      const dateKey = currentDate.toISOString().split("T")[0];
+      const timeSlot = timeSlotMap.get(dateKey);
+      const bookingCount = bookingCountMap.get(dateKey) || 0;
+
+      let color = "green";
+
+      if (timeSlot) {
+        if (timeSlot.isOffDay) {
+          color = "red";
+        } else {
+          const totalSlots = timeSlot.slots.length;
+          const bookedSlots = timeSlot.slots.filter(
+            (s: any) => s.isBooked
+          ).length;
+
+          if (bookedSlots === totalSlots) {
+            color = "gray";
+          } else {
+            color = "green";
+          }
+        }
+      } else {
+        color = "green";
+      }
+
+      calendarData.push({
+        date: dateKey,
+        day: day,
+        color: color,
+        isOffDay: timeSlot?.isOffDay || false,
+        totalBookings: bookingCount,
+        availableSlots: timeSlot
+          ? timeSlot.slots.filter(
+              (s: any) => s.isAvailable && !s.isBooked && !s.isBlocked
+            ).length
+          : generateDefaultSlots().length,
+      });
+    }
+
+    res.status(200).json({
+      message: "Worker monthly calendar fetched successfully",
+      year,
+      month,
+      data: calendarData,
+    });
+  } catch (err: any) {
+    console.error("Error fetching worker monthly calendar:", err);
+    res.status(500).json({
+      message: "Error fetching worker monthly calendar",
       error: err.message,
     });
   }
@@ -256,22 +675,18 @@ export const getCustomerBookings = async (req: any, res: Response) => {
     const status = req.query.status; // optional: "booked" | "completed" | "cancelled"
     const filterType = req.query.filter; // optional: "upcoming" | "completed"
 
-    // Base query
     const query: any = { customer: customerId };
 
-    // Month + year filtering
     if (month && year) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
       query.date = { $gte: startDate, $lte: endDate };
     }
 
-    // Filter by status
     if (status) {
       query.status = status;
     }
 
-    // Date-based filter
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (filterType === "upcoming") {
@@ -280,7 +695,6 @@ export const getCustomerBookings = async (req: any, res: Response) => {
       query.date = { ...query.date, $lt: today };
     }
 
-    // Count + Data
     const total = await BookingModel.countDocuments(query);
     const bookings = await BookingModel.find(query)
       .populate({
@@ -289,13 +703,12 @@ export const getCustomerBookings = async (req: any, res: Response) => {
       })
       .populate({
         path: "services.service",
-        select: "name price",
+        select: "serviceName price subcategory",
       })
       .sort({ date: 1, startTime: 1 })
       .skip(skip)
       .limit(limit);
 
-    // Group bookings by date
     const groupedByDate = bookings.reduce((acc: any, booking: any) => {
       const day = booking.date.toISOString().split("T")[0];
       if (!acc[day]) acc[day] = [];
@@ -319,6 +732,225 @@ export const getCustomerBookings = async (req: any, res: Response) => {
     console.error("Error fetching customer bookings:", err);
     res.status(500).json({
       message: "Error fetching customer bookings",
+      error: err.message,
+    });
+  }
+};
+
+// --------------------
+// Get Workers Popularity
+// --------------------
+export const getWorkerPopularity = async (req: Request, res: Response) => {
+  try {
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+
+    if (!month || !year) {
+      res.status(400).json({
+        message: "Month and year are required",
+      });
+      return;
+    }
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const popularity = await BookingModel.aggregate([
+      {
+        $match: {
+          date: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: "$worker",
+          totalBookings: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "workers",
+          localField: "_id",
+          foreignField: "_id",
+          as: "worker",
+        },
+      },
+      { $unwind: "$worker" },
+
+      {
+        $project: {
+          _id: 0,
+          workerName: {
+            $concat: ["$worker.firstName", " ", "$worker.lastName"],
+          },
+          totalBookings: 1,
+        },
+      },
+
+      { $sort: { totalBookings: -1 } },
+    ]);
+
+    res.status(200).json({
+      message: "Worker popularity fetched successfully",
+      data: popularity,
+    });
+  } catch (err: any) {
+    console.error("Error fetching popularity:", err);
+    res.status(500).json({
+      message: "Error fetching worker popularity",
+      error: err.message,
+    });
+  }
+};
+
+// --------------------
+// Get Bookings Trends
+// --------------------
+export const getBookingTrends = async (req: Request, res: Response) => {
+  try {
+    const year = parseInt(req.query.year as string);
+
+    if (!year) {
+      res.status(400).json({
+        message: "Year is required",
+      });
+      return;
+    }
+
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31, 23, 59, 59);
+
+    const result = await BookingModel.aggregate([
+      {
+        $match: {
+          date: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: { $month: "$date" },
+          totalBookings: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    const finalData = monthNames.map((name, index) => {
+      const monthNumber = index + 1;
+      const found = result.find((r: any) => r._id === monthNumber);
+
+      return {
+        month: name,
+        totalBookings: found ? found.totalBookings : 0,
+      };
+    });
+
+    res.status(200).json({
+      message: "Booking trends fetched successfully",
+      data: finalData,
+    });
+  } catch (err: any) {
+    console.error("Error fetching booking trends:", err);
+    res.status(500).json({
+      message: "Error fetching booking trends",
+      error: err.message,
+    });
+  }
+};
+
+// --------------------
+// Get All Bookings
+// --------------------
+export const getAllBookings = async (req: Request, res: Response) => {
+  try {
+    const { page, limit, status } = req.query;
+
+    const filter: any = {};
+
+    if (status) filter.status = status;
+
+    const result = await paginate(BookingModel, {
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+      sort: { createdAt: -1 },
+      filter,
+    });
+
+    let populatedData = await BookingModel.populate(result.data, [
+      {
+        path: "customer",
+        select: "firstName lastName email phone",
+      },
+      {
+        path: "worker",
+        select: "firstName lastName email phone",
+      },
+      {
+        path: "services.service",
+        model: "Service",
+        select: "serviceName price subcategory",
+      },
+    ]);
+
+    populatedData = populatedData.map((booking: any) => {
+      const bookingObj = booking.toObject ? booking.toObject() : booking;
+
+      bookingObj.services = bookingObj.services.map((srv: any) => {
+        const serviceDoc = srv.service;
+
+        if (!serviceDoc) return srv;
+
+        const selectedSubcategories = (srv.subcategories || [])
+          .map((subId: any) => {
+            return (serviceDoc.subcategory || []).find(
+              (sub: any) => sub._id.toString() === subId.toString()
+            );
+          })
+          .filter(Boolean);
+
+        return {
+          _id: srv._id,
+          service: {
+            _id: serviceDoc._id,
+            serviceName: serviceDoc.serviceName,
+            price: serviceDoc.price,
+          },
+          subcategories: selectedSubcategories.map((sub: any) => ({
+            _id: sub._id,
+            subcategoryName: sub.subcategoryName,
+            subcategoryPrice: sub.subcategoryPrice,
+          })),
+        };
+      });
+
+      return bookingObj;
+    });
+
+    result.data = populatedData;
+
+    res.status(200).json({
+      message: "All bookings fetched successfully",
+      ...result,
+    });
+  } catch (err: any) {
+    console.error("Error fetching all bookings:", err);
+    res.status(500).json({
+      message: "Error fetching all bookings",
       error: err.message,
     });
   }

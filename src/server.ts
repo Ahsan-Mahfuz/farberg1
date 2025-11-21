@@ -2,6 +2,7 @@ import app from "./app";
 import { config } from "./config";
 import { connectDB } from "./config/db";
 import { seedAdmin } from "./config/seedAdmin";
+import { startCleanupScheduler } from "./modules/booking/booking.controller";
 
 connectDB().then(async () => {
   await seedAdmin();
@@ -15,5 +16,6 @@ connectDB().then(async () => {
 
   app.listen(PORT, () => {
     console.log(`Server running at http://${HOST}:${PORT}`);
+    startCleanupScheduler();
   });
 });

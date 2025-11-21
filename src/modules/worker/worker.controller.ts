@@ -59,6 +59,10 @@ export const registerWorker = async (req: Request, res: Response) => {
   }
 };
 
+// --------------------
+// Get One Worker
+// --------------------
+
 export const getOneWorker = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -76,6 +80,9 @@ export const getOneWorker = async (req: Request, res: Response) => {
   }
 };
 
+// --------------------
+// Get All Worker
+// --------------------
 export const getAllWorker = async (req: Request, res: Response) => {
   try {
     const { isBlocked } = req.query;
