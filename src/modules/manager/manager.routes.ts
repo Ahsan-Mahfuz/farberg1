@@ -1,11 +1,13 @@
 import express from "express";
 import {
   changePassword,
+  getAllManagers,
   getMyProfile,
   loginManger,
   registerManager,
   sendOtp,
   setNewPassword,
+  toggleBlockManager,
   updateProfile,
   verifyOtp,
 } from "./manager.controller";
@@ -38,6 +40,13 @@ managerRouter.post(
   "/change-password",
   authenticateAdminOrManager,
   changePassword
+);
+managerRouter.get("/get-all-managers", authenticateAdmin, getAllManagers);
+
+managerRouter.patch(
+  "/block-unblock/:managerId",
+  authenticateAdmin,
+  toggleBlockManager
 );
 
 export default managerRouter;

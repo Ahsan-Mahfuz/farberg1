@@ -12,7 +12,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 // --------------------
 // Payment Method
 // --------------------
-
 const calculateTotalPrice = async (booking: any) => {
   let total = 0;
 
@@ -105,6 +104,9 @@ export const initializePayment = async (req: any, res: Response) => {
 };
 
 export const handleStripeWebhook = async (req: Request, res: Response) => {
+  console.log(
+    "===============================================================first"
+  );
   const sig = req.headers["stripe-signature"] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -152,14 +154,13 @@ const handleSuccessfulPayment = async (session: Stripe.Checkout.Session) => {
 
     console.log("✅ Payment successful for booking:", bookingId);
 
-    // Update booking to confirmed status
     const booking = await BookingModel.findByIdAndUpdate(
       bookingId,
       {
         isPayment: true,
         transactionId: session.payment_intent as string,
-        status: "booked", // Change from "pending" to "booked"
-        paymentExpiresAt: null, // Clear expiration
+        status: "booked",
+        paymentExpiresAt: null,
       },
       { new: true }
     );
@@ -508,7 +509,7 @@ export const getWorkerBookings = async (req: any, res: Response) => {
     const bookings = await BookingModel.find(query)
       .populate({
         path: "customer",
-        select: "firstName lastName email phone",
+        select: "firstName lastName email phone uploadPhoto",
       })
       .populate({
         path: "services.service",
@@ -699,7 +700,7 @@ export const getCustomerBookings = async (req: any, res: Response) => {
     const bookings = await BookingModel.find(query)
       .populate({
         path: "worker",
-        select: "firstName lastName email phone",
+        select: "firstName lastName email phone uploadPhoto",
       })
       .populate({
         path: "services.service",
@@ -894,11 +895,12 @@ export const getAllBookings = async (req: Request, res: Response) => {
     let populatedData = await BookingModel.populate(result.data, [
       {
         path: "customer",
-        select: "firstName lastName email phone",
+        select:
+          "firstName lastName email phone uploadPhoto address city state zipCode",
       },
       {
         path: "worker",
-        select: "firstName lastName email phone",
+        select: "firstName lastName email phone uploadPhoto workerId ",
       },
       {
         path: "services.service",

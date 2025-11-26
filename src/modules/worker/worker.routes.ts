@@ -7,12 +7,13 @@ import {
 import { authenticateAdmin } from "../../middlewares/adminMiddleware";
 import { photoUpload } from "../../uploads/profilePhotoUpload";
 import { authenticateCustomer } from "../../middlewares/customerMiddleware";
+import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
 const workerRouter = express.Router();
 
 workerRouter.post(
   "/register",
-  authenticateAdmin,
+  authenticateAdminOrManager,
   photoUpload.single("workerProfileImage"),
   registerWorker
 );

@@ -10,6 +10,8 @@ import {
   uploadProfilePicture,
   verifyOtp,
   getAllCustomers,
+  toggleBlockUser,
+  getOneCustomer,
 } from "./customer.controller";
 import { photoUpload } from "../../uploads/profilePhotoUpload";
 import { customerOrWorkerMiddleware } from "../../middlewares/customerOrWorkerMiddleware";
@@ -30,6 +32,11 @@ customerRouter.get(
   authenticateAdminOrManager,
   getAllCustomers
 );
+customerRouter.get(
+  "/get-one-customer/:id",
+  authenticateAdminOrManager,
+  getOneCustomer
+);
 
 // common api for customer and worker
 customerOrWorkerRouter.post("/login", loginCustomerOrWorker);
@@ -42,6 +49,11 @@ customerOrWorkerRouter.patch(
   customerOrWorkerMiddleware,
   photoUpload.single("customerProfileImage"),
   updateProfile
+);
+customerOrWorkerRouter.patch(
+  "/update-block-unblock/:userId",
+  authenticateAdminOrManager,
+  toggleBlockUser
 );
 
 export { customerOrWorkerRouter, customerRouter };

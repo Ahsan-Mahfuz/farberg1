@@ -5,6 +5,7 @@ export interface IWorker extends Document {
   firstName: string;
   lastName?: string;
   address: string;
+  title?: string;
   city: string;
   state: string;
   phone: string;
@@ -17,6 +18,7 @@ export interface IWorker extends Document {
   otpExpires?: Date | null;
   otpVerified?: boolean;
   role: string;
+  zipCode: string;
   services: {
     service: Types.ObjectId | IService;
     subcategories?: Types.ObjectId[];
@@ -28,6 +30,7 @@ const workerSchema = new Schema<IWorker>(
     firstName: { type: String, required: true },
     lastName: { type: String, required: false },
     address: { type: String, required: true },
+    title: { type: String, required: false },
     city: { type: String, required: true },
     state: { type: String, required: true },
     phone: { type: String, required: true },
@@ -35,6 +38,7 @@ const workerSchema = new Schema<IWorker>(
     password: { type: String, required: true },
     uploadPhoto: { type: String, default: null },
     isBlocked: { type: Boolean, default: false },
+    zipCode: { type: String, required: true },
     workerId: { type: String },
     resetOtp: { type: Number, default: null },
     otpExpires: { type: Date, default: null },

@@ -11,6 +11,8 @@ export const workerProfileSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   workerId: z.string().min(1, "Worker ID is required"),
+  title: z.string().optional(),
+  zipCode: z.string().min(1, "Zip code is required"),
   services: z.array(
     z.object({
       service: z.string().min(1, "Service ID is required"),

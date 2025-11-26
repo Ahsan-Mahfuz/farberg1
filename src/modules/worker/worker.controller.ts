@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { WorkerModel } from "./worker.model";
 import { workerProfileSchema } from "./worker.validation";
+import { paginate } from "../../helper/paginationHelper";
+import { title } from "process";
 
 // --------------------
 // Register Worker
@@ -85,18 +87,83 @@ export const getOneWorker = async (req: Request, res: Response) => {
 // --------------------
 export const getAllWorker = async (req: Request, res: Response) => {
   try {
-    const { isBlocked } = req.query;
+    const { page, limit, search, isBlocked, sortBy, order } = req.query;
 
     const filter: any = {};
+
     if (isBlocked !== undefined) {
       filter.isBlocked = isBlocked === "true";
     }
 
-    const workers = await WorkerModel.find(filter).select(
-      "-password -resetOtp -otpExpires -__v -otpVerified -createdAt -updatedAt"
+    if (search) {
+      const regex = new RegExp(search as string, "i");
+
+      filter.$or = [
+        { firstName: regex },
+        { lastName: regex },
+        { email: regex },
+        { phone: regex },
+        { title: regex },
+      ];
+    }
+    const sort: any = {};
+    if (sortBy) {
+      sort[String(sortBy)] = order === "asc" ? 1 : -1;
+    } else {
+      sort.createdAt = -1;
+    }
+
+    const result = await paginate(WorkerModel, {
+      page: Number(page),
+      limit: Number(limit),
+      sort,
+      filter,
+    });
+
+    const populatedData = await Promise.all(
+      result.data.map(async (worker: any) => {
+        const obj = worker.toObject ? worker.toObject() : worker;
+
+        obj.services = await Promise.all(
+          obj.services.map(async (s: any) => {
+            const serviceDoc = await WorkerModel.db
+              .collection("services")
+              .findOne({ _id: s.service });
+
+            const subcategories = s.subcategories
+              ? await Promise.all(
+                  s.subcategories.map(async (subId: any) => {
+                    return await WorkerModel.db
+                      .collection("subcategories")
+                      .findOne({ _id: subId });
+                  })
+                )
+              : [];
+
+            return {
+              service: serviceDoc,
+              subcategories,
+            };
+          })
+        );
+
+        delete obj.password;
+        delete obj.resetOtp;
+        delete obj.otpExpires;
+        delete obj.__v;
+        delete obj.otpVerified;
+        delete obj.createdAt;
+        delete obj.updatedAt;
+
+        return obj;
+      })
     );
 
-    res.status(200).json({ message: "Workers found", data: workers });
+    res.status(200).json({
+      message: "Workers fetched successfully",
+      data: populatedData,
+      pagination: result.pagination,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error getting workers", error: err });

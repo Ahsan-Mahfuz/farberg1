@@ -15,6 +15,7 @@ export interface IBooking extends Document {
   status: "booked" | "completed" | "cancelled" | "expired" | "pending";
   isPayment: { type: Boolean; default: false };
   transactionId: { type: String; default: null };
+  paymentAmount: Number;
   paymentExpiresAt: Date | null;
 }
 
@@ -38,8 +39,9 @@ const bookingSchema = new Schema<IBooking>(
     status: {
       type: String,
       enum: ["booked", "completed", "cancelled", "expired", "pending"],
-      default: "booked",
+      default: "pending",
     },
+    paymentAmount: { type: Number, default: 0 },
     isPayment: { type: Boolean, default: false },
     transactionId: { type: String, default: null },
     paymentExpiresAt: { type: Date, default: null },

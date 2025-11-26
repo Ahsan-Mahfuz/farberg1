@@ -133,9 +133,9 @@ export const getMyProfile = async (req: any, res: Response) => {
       return;
     }
 
-    const user = await ManagerModel.findById(userId).select(
-      "-password -_v -otpVerified -resetOtp -otpExpires"
-    );
+    const user = await ManagerModel.findById(userId)
+      .populate("accessibility")
+      .select("-password -_v -otpVerified -resetOtp -otpExpires");
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
@@ -197,6 +197,44 @@ export const updateProfile = async (req: any, res: Response) => {
     console.error(err);
     res.status(400).json({
       message: err.errors?.[0]?.message || "Error updating profile",
+    });
+  }
+};
+
+// --------------------
+// Block/Unblock Manager
+// --------------------
+
+export const toggleBlockManager = async (req: Request, res: Response) => {
+  try {
+    const { managerId } = req.params;
+
+    if (!managerId) {
+      res.status(400).json({ message: "managerId is required" });
+      return;
+    }
+
+    const manager = await ManagerModel.findById(managerId);
+
+    if (!manager) {
+      res.status(404).json({ message: "Manager not found" });
+      return;
+    }
+
+    manager.isBlocked = !manager.isBlocked;
+    await manager.save();
+
+    res.status(200).json({
+      message: `Manager has been ${
+        manager.isBlocked ? "blocked" : "unblocked"
+      } successfully`,
+      data: manager,
+    });
+  } catch (error: any) {
+    console.error("Error toggling manager status:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
     });
   }
 };
@@ -363,5 +401,47 @@ export const changePassword = async (req: any, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error changing password" });
+  }
+};
+
+// --------------------
+// Get All Managers (with Search)
+// --------------------
+
+export const getAllManagers = async (req: Request, res: Response) => {
+  try {
+    const { search } = req.query;
+
+    const searchCondition: any = {};
+
+    if (search) {
+      const regex = new RegExp(search as string, "i");
+
+      searchCondition.$or = [
+        { firstName: regex },
+        { lastName: regex },
+        { email: regex },
+        { phone: regex },
+        { city: regex },
+        { state: regex },
+      ];
+    }
+
+    const managers = await ManagerModel.find(searchCondition)
+      .populate("accessibility")
+      .select("-password -resetOtp -otpExpires")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      message: "Managers fetched successfully",
+      data: managers,
+    });
+  } catch (error: any) {
+    console.error("Error fetching managers:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch managers",
+      error: error.message,
+    });
   }
 };

@@ -6,6 +6,7 @@ interface IContactUs extends Document {
   email: string;
   message: string;
   isRead: boolean;
+  subject: string;
 }
 
 const contactUsSchema = new Schema<IContactUs>(
@@ -14,6 +15,7 @@ const contactUsSchema = new Schema<IContactUs>(
     lastName: { type: String, required: false },
     email: { type: String, required: true },
     message: { type: String, required: true },
+    subject: { type: String, required: true },
     isRead: { type: Boolean, default: false },
   },
   { timestamps: true }

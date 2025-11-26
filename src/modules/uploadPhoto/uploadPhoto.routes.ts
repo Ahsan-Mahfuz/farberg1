@@ -7,12 +7,13 @@ import {
 } from "./uploadPhoto.controller";
 import { photoUpload } from "../../uploads/profilePhotoUpload";
 import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
+import { mediaUpload } from "../../uploads/dynamicImageOrVideo";
 
 const uploadPhotoRouter = express.Router();
 
 uploadPhotoRouter.post(
-  "/create-dynamic-photo",
-  photoUpload.single("dynamicPhoto"),
+  "/create-dynamic-photo-or-video",
+  mediaUpload.single("dynamicUpload"),
   authenticateAdminOrManager,
   createUploadPhoto
 );

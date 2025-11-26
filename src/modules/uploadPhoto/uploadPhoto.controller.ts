@@ -4,45 +4,57 @@ import { UploadPhotoModel } from "./uploadPhoto.model";
 
 export const createUploadPhoto = async (req: Request, res: Response) => {
   try {
-    const validatedData: UploadPhotoInput = uploadPhotoSchema.parse({
+    const validatedData = uploadPhotoSchema.parse({
       title: req.body.title,
     });
 
-    const image = req.file
-      ? `/picture/profile_image/${req.file.filename}`
-      : undefined;
+    if (!req.file) {
+      res.status(400).json({ message: "No file uploaded" });
+      return;
+    }
 
-    const fullImageUrl = image
-      ? `http://${process?.env?.HOST}:${process?.env?.PORT}${image}`
-      : undefined;
+    const isImage = req.file.mimetype.startsWith("image/");
+    const isVideo = req.file.mimetype.startsWith("video/");
 
-    const existingPhoto = await UploadPhotoModel.findOne({
+    if (!isImage && !isVideo) {
+      res
+        .status(400)
+        .json({ message: "Only image or video files are allowed" });
+      return;
+    }
+
+    const filePath = `/picture/dynamic_file/${req.file.filename}`;
+
+    const fullFileUrl = `http://${process.env.HOST}:${process.env.PORT}${filePath}`;
+
+    const existingRecord = await UploadPhotoModel.findOne({
       title: validatedData.title,
     });
 
-    if (existingPhoto) {
-      if (fullImageUrl) {
-        existingPhoto.image = fullImageUrl;
-      }
-      await existingPhoto.save();
+    if (existingRecord) {
+      if (isImage) existingRecord.image = fullFileUrl;
+      if (isVideo) existingRecord.video = fullFileUrl;
+
+      await existingRecord.save();
 
       res.status(200).json({
-        message: "Photo updated successfully",
-        data: existingPhoto,
+        message: `${isImage ? "Image" : "Video"} updated successfully`,
+        data: existingRecord,
       });
       return;
     }
 
-    const newPhoto = new UploadPhotoModel({
+    const newRecord = new UploadPhotoModel({
       title: validatedData.title,
-      image: fullImageUrl,
+      image: isImage ? fullFileUrl : null,
+      video: isVideo ? fullFileUrl : null,
     });
 
-    await newPhoto.save();
+    await newRecord.save();
 
     res.status(201).json({
-      message: "Photo uploaded successfully",
-      data: newPhoto,
+      message: `${isImage ? "Image" : "Video"} uploaded successfully`,
+      data: newRecord,
     });
   } catch (err: any) {
     if (err?.issues) {

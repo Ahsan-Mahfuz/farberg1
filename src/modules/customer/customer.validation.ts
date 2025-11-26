@@ -7,6 +7,7 @@ export const customerProfileSchema = z.object({
   address: z.string(),
   city: z.string(),
   state: z.string(),
+  zipCode: z.string().optional(),
   phone: z.string(),
   email: z.string().email("Invalid email address"),
 });
@@ -16,7 +17,6 @@ export const customerPasswordSchema = z.object({
   email: z.string().email("Email required to set password"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
-
 
 // Step 3: Login setup
 export const customerLoginSchema = z.object({

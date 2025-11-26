@@ -279,6 +279,51 @@ export const updateProfile = async (req: any, res: Response) => {
 };
 
 // --------------------
+//  Block Unblocked user
+// --------------------
+export const toggleBlockUser = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      res.status(400).json({ message: "userId is required" });
+      return;
+    }
+
+    let user = await WorkerModel.findById(userId);
+    if (user) {
+      user.isBlocked = !user.isBlocked;
+      await user.save();
+      res.json({
+        message: `Worker has been ${
+          user.isBlocked ? "blocked" : "unblocked"
+        } successfully`,
+        data: user,
+      });
+      return;
+    }
+
+    user = await CustomerModel.findById(userId);
+    if (user) {
+      user.isBlocked = !user.isBlocked; // Toggle
+      await user.save();
+      res.json({
+        message: `Customer has been ${
+          user.isBlocked ? "blocked" : "unblocked"
+        } successfully`,
+        data: user,
+      });
+      return;
+    }
+
+    res.status(404).json({ message: "User not found" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error updating user status" });
+  }
+};
+
+// --------------------
 // Send OTP (Forgot Password)
 // --------------------
 export const sendOtp = async (req: any, res: Response) => {
@@ -439,6 +484,40 @@ export const getAllCustomers = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error fetching customers:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// --------------------
+// Get One Customer
+// --------------------
+export const getOneCustomer = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({ message: "Customer ID is required" });
+      return;
+    }
+
+    const customer = await CustomerModel.findById(id).select(
+      "-password -resetOtp -otpExpires"
+    );
+
+    if (!customer) {
+      res.status(404).json({ message: "Customer not found" });
+      return;
+    }
+
+    res.status(200).json({
+      message: "Customer retrieved successfully",
+      data: customer,
+    });
+  } catch (error: any) {
+    console.error("Error fetching customer:", error);
     res.status(500).json({
       message: "Internal server error",
       error: error.message,

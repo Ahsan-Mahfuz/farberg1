@@ -24,16 +24,9 @@ bookingRouter.post(
   authenticateCustomer,
   initializePayment
 );
-bookingRouter.post(
-  "/webhook/stripe",
-  express.raw({ type: "application/json" }),
-  handleStripeWebhook
-);
-// bookingRouter.post("/confirm-payment", authenticateCustomer, confirmPayment);
-
-// payment.post(
-//   "/webhook",
-//   bodyParser.raw({ type: "application/json" }),
+// bookingRouter.post(
+//   "/webhook/stripe",
+//   express.raw({ type: "application/json" }),
 //   handleStripeWebhook
 // );
 

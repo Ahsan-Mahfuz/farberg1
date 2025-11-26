@@ -6,6 +6,7 @@ export interface ICustomer extends Document {
   address: string;
   city: string;
   state: string;
+  zipCode?: string;
   phone: string;
   email: string;
   isBlocked: boolean;
@@ -24,6 +25,7 @@ const customerSchema = new Schema<ICustomer>(
     address: { type: String, required: true },
     city: { type: String, required: true },
     state: { type: String, required: true },
+    zipCode: { type: String, required: false },
     phone: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, default: null },

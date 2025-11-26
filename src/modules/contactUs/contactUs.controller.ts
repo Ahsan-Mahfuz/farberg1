@@ -11,9 +11,9 @@ export const createContactUs = async (
   next: NextFunction
 ) => {
   try {
-    const { firstName, lastName, email, message } = req.body;
+    const { firstName, lastName, email, message, subject } = req.body;
 
-    if (!firstName || !email || !message) {
+    if (!firstName || !email || !message || !subject) {
       res
         .status(400)
         .json({ message: "First name, email, and message are required." });
@@ -24,6 +24,7 @@ export const createContactUs = async (
       lastName,
       email,
       message,
+      subject,
     });
 
     res.status(201).json({
