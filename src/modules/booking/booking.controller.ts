@@ -159,6 +159,7 @@ const handleSuccessfulPayment = async (session: Stripe.Checkout.Session) => {
       {
         isPayment: true,
         transactionId: session.payment_intent as string,
+        paymentAmount: session.amount_total as number,
         status: "booked",
         paymentExpiresAt: null,
       },
@@ -476,22 +477,27 @@ export const getWorkerBookings = async (req: any, res: Response) => {
     const query: any = { worker: workerId };
 
     if (date) {
-      const targetDate = new Date(date);
-      const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+      const target = new Date(date);
+
+      const startOfDay = new Date(target);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(target);
+      endOfDay.setHours(23, 59, 59, 999);
+
       query.date = { $gte: startOfDay, $lte: endOfDay };
-    } else if (month && year) {
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0, 23, 59, 59);
-      query.date = { $gte: startDate, $lte: endDate };
-    } else if (filterType) {
+    } else if (!isNaN(month) && !isNaN(year)) {
+      const start = new Date(year, month - 1, 1, 0, 0, 0);
+      const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+      query.date = { $gte: start, $lte: end };
+    } else if (filterType === "upcoming" || filterType === "completed") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (filterType === "upcoming") {
-        query.date = { $gte: today };
-      } else if (filterType === "completed") {
-        query.date = { $lt: today };
-      }
+
+      if (filterType === "upcoming") query.date = { $gte: today };
+
+      if (filterType === "completed") query.date = { $lt: today };
     }
     if (status) {
       query.status = status;
@@ -556,22 +562,26 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
 
     const worker = await WorkerModel.findById(workerId);
     if (!worker) {
-      res.status(404).json({ message: "Worker not found" });
-      return;
+      return res.status(404).json({ message: "Worker not found" });
     }
 
     const year = parseInt(req.query.year);
     const month = parseInt(req.query.month);
 
     if (!year || !month || month < 1 || month > 12) {
-      res.status(400).json({ message: "Valid year and month are required" });
-      return;
+      return res.status(400).json({ message: "Valid year and month are required" });
     }
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+    const startDate = new Date(year, month - 1, 1, 0, 0, 0);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
 
     const daysInMonth = new Date(year, month, 0).getDate();
+
+    const getDateKey = (d: Date) => {
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .split("T")[0];
+    };
 
     const timeSlots = await TimeSlotModel.find({
       worker: workerId,
@@ -587,48 +597,52 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
     const bookingCountMap = new Map();
 
     timeSlots.forEach((slot) => {
-      const dateKey = slot.date.toISOString().split("T")[0];
-      timeSlotMap.set(dateKey, slot);
+      const key = getDateKey(slot.date);
+      timeSlotMap.set(key, slot);
     });
 
     bookings.forEach((booking) => {
-      const dateKey = booking.date.toISOString().split("T")[0];
-      bookingCountMap.set(dateKey, (bookingCountMap.get(dateKey) || 0) + 1);
+      const key = getDateKey(booking.date);
+      bookingCountMap.set(key, (bookingCountMap.get(key) || 0) + 1);
     });
 
-    const calendarData = [];
+    const calendarData: any[] = [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month - 1, day);
-      const dateKey = currentDate.toISOString().split("T")[0];
+      const currentDate = new Date(year, month - 1, day, 0, 0, 0);
+      const dateKey = getDateKey(currentDate);
+
       const timeSlot = timeSlotMap.get(dateKey);
       const bookingCount = bookingCountMap.get(dateKey) || 0;
 
-      let color = "green";
+      let color = "";
 
-      if (timeSlot) {
+      if (currentDate < today) {
+        color = "bg-gray-200";
+      } else if (timeSlot) {
         if (timeSlot.isOffDay) {
-          color = "red";
+          color = "bg-red-500";
         } else {
           const totalSlots = timeSlot.slots.length;
-          const bookedSlots = timeSlot.slots.filter(
-            (s: any) => s.isBooked
-          ).length;
+          const bookedSlots = timeSlot.slots.filter((s: any) => s.isBooked).length;
 
           if (bookedSlots === totalSlots) {
-            color = "gray";
+            color = "bg-gray-400"; // fully booked
           } else {
-            color = "green";
+            color = "bg-green-500"; // available
           }
         }
       } else {
-        color = "green";
+        color = "white"; // No timeslot created
       }
 
       calendarData.push({
         date: dateKey,
-        day: day,
-        color: color,
+        day,
+        color,
         isOffDay: timeSlot?.isOffDay || false,
         totalBookings: bookingCount,
         availableSlots: timeSlot
@@ -639,7 +653,7 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Worker monthly calendar fetched successfully",
       year,
       month,
@@ -653,6 +667,7 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
     });
   }
 };
+
 
 // --------------------
 // Get Customer Bookings
@@ -809,7 +824,7 @@ export const getWorkerPopularity = async (req: Request, res: Response) => {
 // --------------------
 export const getBookingTrends = async (req: Request, res: Response) => {
   try {
-    const year = parseInt(req.query.year as string);
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
 
     if (!year) {
       res.status(400).json({
@@ -879,11 +894,79 @@ export const getBookingTrends = async (req: Request, res: Response) => {
 // --------------------
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
-    const { page, limit, status } = req.query;
-
+    const { page, limit, status, filterType } = req.query;
     const filter: any = {};
 
     if (status) filter.status = status;
+
+    // ================== TIME BASED FILTER ==================
+    const now = new Date();
+
+    const convertTimeToMs = (time: string) => {
+      const [h, m] = time.split(":").map(Number);
+      return h * 60 * 60 * 1000 + m * 60 * 1000;
+    };
+
+    // Upcoming = endTime not passed
+    if (filterType === "upcoming") {
+      filter.$expr = {
+        $gt: [
+          {
+            $add: [
+              "$date",
+              {
+                $add: [
+                  {
+                    $multiply: [
+                      { $toInt: { $substr: ["$endTime", 0, 2] } },
+                      3600000,
+                    ],
+                  },
+                  {
+                    $multiply: [
+                      { $toInt: { $substr: ["$endTime", 3, 2] } },
+                      60000,
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          now,
+        ],
+      };
+    }
+
+    // Completed = endTime already passed
+    if (filterType === "completed") {
+      filter.$expr = {
+        $lte: [
+          {
+            $add: [
+              "$date",
+              {
+                $add: [
+                  {
+                    $multiply: [
+                      { $toInt: { $substr: ["$endTime", 0, 2] } },
+                      3600000,
+                    ],
+                  },
+                  {
+                    $multiply: [
+                      { $toInt: { $substr: ["$endTime", 3, 2] } },
+                      60000,
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          now,
+        ],
+      };
+    }
+    // ========================================================
 
     const result = await paginate(BookingModel, {
       page: Number(page) || 1,
@@ -900,7 +983,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
       },
       {
         path: "worker",
-        select: "firstName lastName email phone uploadPhoto workerId ",
+        select: "firstName lastName email phone uploadPhoto workerId",
       },
       {
         path: "services.service",
@@ -914,15 +997,14 @@ export const getAllBookings = async (req: Request, res: Response) => {
 
       bookingObj.services = bookingObj.services.map((srv: any) => {
         const serviceDoc = srv.service;
-
         if (!serviceDoc) return srv;
 
         const selectedSubcategories = (srv.subcategories || [])
-          .map((subId: any) => {
-            return (serviceDoc.subcategory || []).find(
+          .map((subId: any) =>
+            (serviceDoc.subcategory || []).find(
               (sub: any) => sub._id.toString() === subId.toString()
-            );
-          })
+            )
+          )
           .filter(Boolean);
 
         return {
@@ -945,15 +1027,116 @@ export const getAllBookings = async (req: Request, res: Response) => {
 
     result.data = populatedData;
 
-    res.status(200).json({
-      message: "All bookings fetched successfully",
-      ...result,
-    });
+    res
+      .status(200)
+      .json({ message: "All bookings fetched successfully", ...result });
   } catch (err: any) {
     console.error("Error fetching all bookings:", err);
+    res
+      .status(500)
+      .json({ message: "Error fetching all bookings", error: err.message });
+  }
+};
+
+// --------------------
+// Get All Transaction
+// --------------------
+export const getAllTransactions = async (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const result = await paginate(BookingModel, {
+      page: Number(page),
+      limit: Number(limit),
+      filter: { isPayment: true },
+      sort: { createdAt: -1 },
+    });
+
+    const populatedData = await BookingModel.populate(result.data, [
+      { path: "customer", select: "firstName lastName email phone" },
+      {
+        path: "worker",
+        select: "firstName lastName phone uploadPhoto workerId",
+      },
+      { path: "services.service", select: "serviceName price" },
+    ]);
+
+    res.status(200).json({
+      message: "All Transactions fetched successfully",
+      pagination: result.pagination,
+      transactions: populatedData,
+    });
+  } catch (err: any) {
     res.status(500).json({
-      message: "Error fetching all bookings",
+      message: "Error fetching transactions",
       error: err.message,
+    });
+  }
+};
+
+// --------------------
+// Get Review Api
+// --------------------
+export const getMonthlyEarnings = async (req: Request, res: Response) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+
+    const result = await BookingModel.aggregate([
+      {
+        $match: {
+          isPayment: true,
+          status: { $in: ["completed", "booked"] },
+          date: {
+            $gte: new Date(year, 0, 1),
+            $lte: new Date(year, 11, 31, 23, 59, 59),
+          },
+        },
+      },
+
+      // group by month
+      {
+        $group: {
+          _id: { month: { $month: "$date" } },
+          totalAmount: { $sum: "$paymentAmount" },
+          count: { $sum: 1 },
+        },
+      },
+
+      // sort by month
+      { $sort: { "_id.month": 1 } },
+
+      // final formatting
+      {
+        $project: {
+          _id: 0,
+          month: {
+            $concat: [
+              { $toString: year },
+              "-",
+              {
+                $cond: [
+                  { $lte: ["$_id.month", 9] },
+                  { $concat: ["0", { $toString: "$_id.month" }] },
+                  { $toString: "$_id.month" },
+                ],
+              },
+            ],
+          },
+          totalAmount: 1,
+          count: 1,
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      message: "Monthly earnings retrieved successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Error fetching monthly earnings:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
     });
   }
 };

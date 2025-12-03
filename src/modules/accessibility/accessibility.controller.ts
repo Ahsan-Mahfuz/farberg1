@@ -12,7 +12,7 @@ export const updateManagerAccessibility = async (
 ) => {
   try {
     const { managerId } = req.params;
-    
+
     const validation = updateAccessibilityValidation.safeParse(req.body);
 
     if (!validation.success) {

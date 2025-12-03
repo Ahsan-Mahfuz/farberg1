@@ -13,6 +13,7 @@ export const workerProfileSchema = z.object({
   workerId: z.string().min(1, "Worker ID is required"),
   title: z.string().optional(),
   zipCode: z.string().min(1, "Zip code is required"),
+  isBlocked: z.boolean().optional(),
   services: z.array(
     z.object({
       service: z.string().min(1, "Service ID is required"),

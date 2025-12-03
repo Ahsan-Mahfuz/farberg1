@@ -2,6 +2,7 @@ import express from "express";
 import {
   bookTimeSlot,
   getAllBookings,
+  getAllTransactions,
   getBookingTrends,
   getCustomerBookings,
   getWorkerBookings,
@@ -55,6 +56,11 @@ bookingRouter.get(
   "/get-all-bookings",
   authenticateAdminOrManager,
   getAllBookings
+);
+bookingRouter.get(
+  "/get-all-transactions",
+  authenticateAdminOrManager,
+  getAllTransactions
 );
 
 export default bookingRouter;

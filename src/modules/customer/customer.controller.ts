@@ -144,6 +144,7 @@ export const loginCustomerOrWorker = async (
         phone: user.phone,
         email: user.email,
         role: user.role,
+        isBlocked: user.isBlocked,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
@@ -435,6 +436,7 @@ export const setNewPassword = async (req: any, res: Response) => {
         phone: user.phone,
         email: user.email,
         role: user.role,
+        isBlocked: user.isBlocked,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }

@@ -45,7 +45,7 @@ export const createUploadPhoto = async (req: Request, res: Response) => {
     }
 
     const newRecord = new UploadPhotoModel({
-      title: validatedData.title,
+      title: validatedData.title.toLowerCase(),
       image: isImage ? fullFileUrl : null,
       video: isVideo ? fullFileUrl : null,
     });
@@ -79,7 +79,7 @@ export const getAllPhotos = async (req: Request, res: Response) => {
 export const getPhotoByTitle = async (req: Request, res: Response) => {
   try {
     const { name } = req.params;
-    const photo = await UploadPhotoModel.findOne({ title: name });
+    const photo = await UploadPhotoModel.findOne({ title: name.toLowerCase() });
     if (!photo) {
       res.status(404).json({ message: "Photo not found" });
       return;

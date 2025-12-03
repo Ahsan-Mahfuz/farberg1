@@ -5,6 +5,7 @@ import {
 } from "./services.validation";
 import { ServiceModel } from "./services.model";
 import { paginate } from "../../helper/paginationHelper";
+import { BookingModel } from "../booking/booking.model";
 
 // --------------------
 //  Create Service
@@ -167,30 +168,27 @@ export const deleteService = async (req: Request, res: Response) => {
 // --------------------
 //   Service Popularity
 // --------------------
-export const getServicePopularity = async (req: Request, res: Response) => {
+export const getServicePopularity = async (req: any, res: Response) => {
   try {
+    console.log(req.query)
     const year = Number(req.query.year) || new Date().getFullYear();
-    const month = Number(req.query.month);
+    const month = Number(req.query.month) || new Date().getMonth() + 1;
+    console.log(year)
 
-    const match: any = {
-      bookedAt: {
-        $gte: new Date(year, month ? month - 1 : 0, 1),
-        $lte: new Date(
-          year,
-          month ? month : 11,
-          month ? new Date(year, month, 0).getDate() : 31,
-          23,
-          59,
-          59
-        ),
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const result = await BookingModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate, $lte: endDate },
+          status: { $in: ["booked", "completed"] },
+        },
       },
-    };
-
-    const result = await ServiceModel.aggregate([
-      { $match: match },
+      { $unwind: "$services" },
       {
         $group: {
-          _id: "$serviceId",
+          _id: "$services.service",
           totalBookings: { $sum: 1 },
         },
       },
@@ -205,7 +203,7 @@ export const getServicePopularity = async (req: Request, res: Response) => {
       { $unwind: "$service" },
       {
         $project: {
-          _id: 0,
+          serviceId: "$service._id",
           serviceName: "$service.serviceName",
           totalBookings: 1,
         },

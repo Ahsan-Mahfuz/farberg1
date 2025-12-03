@@ -6,6 +6,7 @@ interface JwtPayload {
   id: string;
   email: string;
   role: string;
+  isBlocked: boolean;
 }
 
 export const authenticateManager = (
@@ -26,6 +27,11 @@ export const authenticateManager = (
 
     if (decoded.role !== "manager") {
       res.status(403).json({ message: "Forbidden: Not a manager" });
+      return;
+    }
+
+    if (decoded?.isBlocked) {
+      res.status(401).json({ message: "Unauthorized: User is blocked" });
       return;
     }
 

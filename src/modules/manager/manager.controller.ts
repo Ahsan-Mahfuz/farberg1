@@ -110,6 +110,7 @@ export const loginManger = async (
         managerId: user.managerId,
         uploadPhoto: user.uploadPhoto,
         accessibility: user.accessibility,
+        isBlocked: user.isBlocked,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }

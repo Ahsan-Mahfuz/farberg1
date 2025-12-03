@@ -6,6 +6,7 @@ interface JwtPayload {
   id: string;
   email: string;
   role: string;
+  isBlocked: boolean;
 }
 
 export const authenticateAdmin = (
@@ -24,10 +25,15 @@ export const authenticateAdmin = (
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, config.jwt_secret) as JwtPayload;
 
-    console.log(decoded)
+    console.log(decoded);
 
     if (decoded?.role !== "admin") {
       res.status(403).json({ message: "Forbidden: Not an admin" });
+      return;
+    }
+
+    if (decoded?.isBlocked) {
+      res.status(401).json({ message: "Unauthorized: User is blocked" });
       return;
     }
 
