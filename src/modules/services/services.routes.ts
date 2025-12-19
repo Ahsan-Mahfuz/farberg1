@@ -6,6 +6,8 @@ import {
   getAllServices,
   getServiceById,
   getServicePopularity,
+  createOrUpdateServiceTime,
+  getServiceTime,
 } from "./services.controller";
 import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 
@@ -33,5 +35,12 @@ serviceRouter.get(
   authenticateAdminOrManager,
   getServicePopularity
 );
+
+serviceRouter.post(
+  "/service-time",
+  authenticateAdminOrManager,
+  createOrUpdateServiceTime
+);
+serviceRouter.get("/service-time", authenticateAdminOrManager, getServiceTime);
 
 export default serviceRouter;

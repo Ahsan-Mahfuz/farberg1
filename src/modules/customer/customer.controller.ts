@@ -120,6 +120,14 @@ export const loginCustomerOrWorker = async (
     const { email, password } = customerLoginSchema.parse(req.body);
 
     const found = await findUserByEmail(email);
+
+    if (found && found?.user?.isBlocked) {
+      res
+        .status(400)
+        .json({ message: "Your account is blocked" });
+      return;
+    }
+
     if (!found || !found.user.password) {
       res.status(400).json({ message: "Invalid credentials" });
       return;
@@ -169,7 +177,7 @@ export const getMyProfile = async (req: any, res: Response) => {
         res.status(404).json({ message: "Worker not found" });
         return;
       }
-      res.json({ data: user });
+      res.json(user);
       return;
     }
 

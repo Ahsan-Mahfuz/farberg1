@@ -86,6 +86,14 @@ export const loginManger = async (
     const user = await ManagerModel.findOne({ email }).populate(
       "accessibility"
     );
+
+    if (user?.isBlocked) {
+      res
+        .status(400)
+        .json({ message: "Your account is blocked. Contact super admin" });
+      return;
+    }
+
     if (!user || !user.password) {
       res.status(400).json({ message: "Invalid credentials" });
       return;
@@ -428,7 +436,10 @@ export const getAllManagers = async (req: Request, res: Response) => {
       ];
     }
 
-    const managers = await ManagerModel.find(searchCondition)
+    const managers = await ManagerModel.find({
+      ...searchCondition,
+      role: "manager",
+    })
       .populate("accessibility")
       .select("-password -resetOtp -otpExpires")
       .sort({ createdAt: -1 });

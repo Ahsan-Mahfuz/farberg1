@@ -8,6 +8,8 @@ import {
 import { photoUpload } from "../../uploads/profilePhotoUpload";
 import { authenticateAdminOrManager } from "../../middlewares/adminOrManagerMiddleware";
 import { mediaUpload } from "../../uploads/dynamicImageOrVideo";
+import { authenticateCustomer } from "../../middlewares/customerMiddleware";
+import { authenticateWorker } from "../../middlewares/workerMiddleware";
 
 const uploadPhotoRouter = express.Router();
 
@@ -20,7 +22,6 @@ uploadPhotoRouter.post(
 
 uploadPhotoRouter.get(
   "/get-all-dynamic-photo",
-  authenticateAdminOrManager,
   getAllPhotos
 );
 

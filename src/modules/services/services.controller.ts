@@ -3,7 +3,7 @@ import {
   createServiceValidation,
   updateServiceValidation,
 } from "./services.validation";
-import { ServiceModel } from "./services.model";
+import { ServiceModel, ServiceTimeModel } from "./services.model";
 import { paginate } from "../../helper/paginationHelper";
 import { BookingModel } from "../booking/booking.model";
 
@@ -170,10 +170,10 @@ export const deleteService = async (req: Request, res: Response) => {
 // --------------------
 export const getServicePopularity = async (req: any, res: Response) => {
   try {
-    console.log(req.query)
+    console.log(req.query);
     const year = Number(req.query.year) || new Date().getFullYear();
     const month = Number(req.query.month) || new Date().getMonth() + 1;
-    console.log(year)
+    console.log(year);
 
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
@@ -220,6 +220,70 @@ export const getServicePopularity = async (req: any, res: Response) => {
     res.status(500).json({
       message: "Internal server error",
       error: error.message,
+    });
+  }
+};
+
+// --------------------
+//  Update and Create Service Time
+// --------------------
+
+export const createOrUpdateServiceTime = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { startTime, endTime } = req.body;
+
+    if (!startTime && !endTime) {
+      res.status(400).json({
+        success: false,
+        message: "startTime and endTime are required",
+      });
+      return;
+    }
+
+    const serviceTime = await ServiceTimeModel.findOneAndUpdate(
+      {},
+      { startTime, endTime },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Service time saved successfully",
+      data: serviceTime,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to save service time",
+      error,
+    });
+  }
+};
+
+// --------------------
+// Get Service Time
+// --------------------
+
+export const getServiceTime = async (req: Request, res: Response) => {
+  try {
+    const serviceTime = await ServiceTimeModel.findOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Service time retrieved successfully",
+      data: serviceTime,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to get service time",
+      error,
     });
   }
 };

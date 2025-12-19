@@ -45,7 +45,7 @@ export const initializePayment = async (req: any, res: Response) => {
     const { bookingId } = req.body;
     const customerId = req.user.userId;
     const currency = "usd";
-    const success_url = "http://10.10.20.16:5137/success";
+    const success_url = "http://localhost:3000/success";
     const cancel_url = "http://10.10.20.16:5137/cancel";
 
     const customer = await CustomerModel.findById(customerId);
@@ -159,7 +159,7 @@ const handleSuccessfulPayment = async (session: Stripe.Checkout.Session) => {
       {
         isPayment: true,
         transactionId: session.payment_intent as string,
-        paymentAmount: session.amount_total as number,
+        paymentAmount: (session.amount_total as number) / 100,
         status: "booked",
         paymentExpiresAt: null,
       },
@@ -262,10 +262,9 @@ export const cleanupExpiredBookings = async () => {
   }
 };
 
-// Run cleanup every minute
 export const startCleanupScheduler = () => {
-  setInterval(cleanupExpiredBookings, 60 * 1000); // Every 1 minute
-  console.log("🔄 Cleanup scheduler started");
+  setInterval(cleanupExpiredBookings, 60 * 1000);
+  console.log("Cleanup scheduler started");
 };
 
 const handleFailedPayment = async (session: Stripe.Checkout.Session) => {
@@ -277,9 +276,6 @@ const handleFailedPayment = async (session: Stripe.Checkout.Session) => {
   }
 };
 
-// --------------------
-// Booking Slot By Customer
-// --------------------
 // --------------------
 // Booking Slot By Customer with Payment Hold
 // --------------------
@@ -331,6 +327,7 @@ export const bookTimeSlot = async (req: any, res: Response) => {
         worker: workerId,
         date,
         slots: generateDefaultSlots(),
+        heldBy: customer?._id,
       });
       await timeSlotDoc.save();
     }
@@ -515,13 +512,17 @@ export const getWorkerBookings = async (req: any, res: Response) => {
     const bookings = await BookingModel.find(query)
       .populate({
         path: "customer",
-        select: "firstName lastName email phone uploadPhoto",
+        select: "firstName lastName email phone uploadPhoto address",
+      })
+      .populate({
+        path: "worker",
+        select: "firstName lastName email phone uploadPhoto address",
       })
       .populate({
         path: "services.service",
         select: "serviceName price subcategory",
       })
-      .sort({ date: 1, startTime: 1 })
+      .sort({ date: -1, startTime: -1 })
       .skip(skip)
       .limit(limit);
 
@@ -558,18 +559,20 @@ export const getWorkerBookings = async (req: any, res: Response) => {
 // --------------------
 export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
   try {
-    const workerId = req.user.userId;
+    const workerId = req.params.workerId;
 
     const worker = await WorkerModel.findById(workerId);
     if (!worker) {
-      return res.status(404).json({ message: "Worker not found" });
+      res.status(404).json({ message: "Worker not found" });
+      return;
     }
 
     const year = parseInt(req.query.year);
     const month = parseInt(req.query.month);
 
     if (!year || !month || month < 1 || month > 12) {
-      return res.status(400).json({ message: "Valid year and month are required" });
+      res.status(400).json({ message: "Valid year and month are required" });
+      return;
     }
 
     const startDate = new Date(year, month - 1, 1, 0, 0, 0);
@@ -627,7 +630,9 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
           color = "bg-red-500";
         } else {
           const totalSlots = timeSlot.slots.length;
-          const bookedSlots = timeSlot.slots.filter((s: any) => s.isBooked).length;
+          const bookedSlots = timeSlot.slots.filter(
+            (s: any) => s.isBooked
+          ).length;
 
           if (bookedSlots === totalSlots) {
             color = "bg-gray-400"; // fully booked
@@ -636,7 +641,7 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
           }
         }
       } else {
-        color = "white"; // No timeslot created
+        color = "bg-white"; // No timeslot created
       }
 
       calendarData.push({
@@ -653,7 +658,7 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
       });
     }
 
-    return res.status(200).json({
+    res.status(200).json({
       message: "Worker monthly calendar fetched successfully",
       year,
       month,
@@ -667,7 +672,6 @@ export const getWorkerMonthlyCalendar = async (req: any, res: Response) => {
     });
   }
 };
-
 
 // --------------------
 // Get Customer Bookings
@@ -718,10 +722,14 @@ export const getCustomerBookings = async (req: any, res: Response) => {
         select: "firstName lastName email phone uploadPhoto",
       })
       .populate({
+        path: "customer",
+        select: "firstName lastName email phone uploadPhoto",
+      })
+      .populate({
         path: "services.service",
         select: "serviceName price subcategory",
       })
-      .sort({ date: 1, startTime: 1 })
+      .sort({ date: -1, startTime: -1 })
       .skip(skip)
       .limit(limit);
 
@@ -1138,5 +1146,98 @@ export const getMonthlyEarnings = async (req: Request, res: Response) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+
+// --------------------
+// Revenue Graph
+// --------------------
+export const getMonthlyRevenue = async (req: Request, res: Response) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    const revenueData = await BookingModel.aggregate([
+      {
+        $match: {
+          isPayment: true,
+          paymentAmount: { $gt: 0 },
+          createdAt: {
+            $gte: new Date(`${year}-01-01T00:00:00Z`),
+            $lte: new Date(`${year}-12-31T23:59:59Z`),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { month: { $month: "$createdAt" } },
+          revenue: { $sum: "$paymentAmount" },
+        },
+      },
+      { $sort: { "_id.month": 1 } },
+    ]);
+
+    const finalData = months.map((m, index) => {
+      const monthIndex = index + 1;
+      const match = revenueData.find((d) => d._id.month === monthIndex);
+
+      return {
+        month: m,
+        revenue: match ? match.revenue : 0,
+      };
+    });
+
+    res.status(200).json({
+      year,
+      revenue: finalData,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// --------------------
+// update status of booking by customer
+// --------------------
+
+export const updateBookingStatus = async (req: any, res: Response) => {
+  try {
+    const { bookingId } = req.params;
+    const id = bookingId;
+    const booking = await BookingModel.findById(id);
+
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+    if (booking?.status === "completed") {
+      res.status(404).json({ message: "Booking already completed" });
+      return;
+    }
+    if (!booking.worker.equals(req.user.userId)) {
+      res.status(400).json({ message: "You are not authorized" });
+      return;
+    }
+    booking.status = "completed";
+    await booking.save();
+    res.status(200).json({ message: "Booking status updated successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };

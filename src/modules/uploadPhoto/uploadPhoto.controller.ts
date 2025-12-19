@@ -28,7 +28,7 @@ export const createUploadPhoto = async (req: Request, res: Response) => {
     const fullFileUrl = `http://${process.env.HOST}:${process.env.PORT}${filePath}`;
 
     const existingRecord = await UploadPhotoModel.findOne({
-      title: validatedData.title,
+      title: validatedData.title.toLowerCase(),
     });
 
     if (existingRecord) {

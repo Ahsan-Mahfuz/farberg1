@@ -121,9 +121,17 @@ export const updateWorker = async (req: Request, res: Response) => {
 export const getOneWorker = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const worker = await WorkerModel.findById(id).select(
-      "-password -resetOtp -otpExpires -__v -otpVerified -createdAt -updatedAt"
-    );
+    const worker = await WorkerModel.findById(id)
+      .select(
+        "-password -resetOtp -otpExpires -__v -otpVerified -createdAt -updatedAt"
+      )
+      .populate({
+        path: "services",
+        populate: {
+          path: "service",
+          model: "Service",
+        },
+      });
     if (!worker) {
       res.status(404).json({ message: "Worker not found" });
       return;

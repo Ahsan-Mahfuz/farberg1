@@ -26,4 +26,30 @@ const serviceSchema = new Schema<IService>(
   { timestamps: true }
 );
 
+export interface IServiceTime extends Document {
+  startTime: string;
+  endTime: string;
+}
+
+const serviceTimeSchema = new Schema<IServiceTime>(
+  {
+    startTime: {
+      type: String,
+      required: true,
+      default: "09:00",
+    },
+    endTime: {
+      type: String,
+      required: true,
+      default: "19:00",
+    },
+  },
+  { timestamps: true }
+);
+
 export const ServiceModel = model<IService>("Service", serviceSchema);
+
+export const ServiceTimeModel = model<IServiceTime>(
+  "ServiceTime",
+  serviceTimeSchema
+);

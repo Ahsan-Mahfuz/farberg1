@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { TimeSlotModel } from "./timeSlot.model";
+import { BookingModel } from "../booking/booking.model";
 
 function generateDefaultSlots() {
   const slots = [];
@@ -55,6 +56,11 @@ export const setWorkerUnAvailability = async (req: any, res: Response) => {
 
     let timeSlot = await TimeSlotModel.findOne({ worker: workerId, date });
 
+    if (timeSlot?.isOffDay === true) {
+      res.status(400).json({ message: "Worker is off day" });
+      return;
+    }
+
     if (!timeSlot) {
       timeSlot = new TimeSlotModel({
         worker: workerId,
@@ -63,9 +69,13 @@ export const setWorkerUnAvailability = async (req: any, res: Response) => {
       });
     }
 
+    console.log(timeSlot);
+
     timeSlot.slots.forEach((slot) => {
       if (unavailableSlots.includes(slot.startTime)) {
         slot.isAvailable = false;
+      } else {
+        slot.isAvailable = true;
       }
     });
 
@@ -97,21 +107,73 @@ export const setOffDay = async (req: any, res: Response) => {
       return;
     }
 
-    const timeSlot = await TimeSlotModel.findOneAndUpdate(
-      { worker: workerId, date },
-      { worker: workerId, date, isOffDay: true, slots: [] },
+    const inputDate = new Date(date);
+    const today = new Date();
+
+    inputDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    if (inputDate < today) {
+      res.status(400).json({ message: "You cannot set past date as off day" });
+      return;
+    }
+
+    const timeSlot = await TimeSlotModel.findOne({
+      worker: workerId,
+      date,
+    });
+
+    const startOfDay = new Date(`${date}T00:00:00.000Z`);
+    const endOfDay = new Date(`${date}T23:59:59.999Z`);
+
+    const bookingExists = await BookingModel.findOne({
+      worker: workerId,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ["pending", "booked"] },
+    });
+
+    if (bookingExists) {
+      res.status(400).json({
+        message:
+          "You cannot set this day as off day. A booking already exists.",
+      });
+      return;
+    }
+
+    if (timeSlot && timeSlot.isOffDay) {
+      const offDay = await TimeSlotModel.findOneAndUpdate(
+        { worker: workerId, date: startOfDay },
+        {
+          worker: workerId,
+          date: startOfDay,
+          isOffDay: false,
+          slots: generateDefaultSlots(),
+        },
+        { upsert: true, new: true }
+      );
+      res.status(200).json({
+        message: "Off day removed successfully",
+        data: offDay,
+      });
+      return;
+    }
+
+    const offDay = await TimeSlotModel.findOneAndUpdate(
+      { worker: workerId, date: startOfDay },
+      { worker: workerId, date: startOfDay, isOffDay: true, slots: [] },
       { upsert: true, new: true }
     );
 
     res.status(200).json({
       message: "Off day set successfully",
-      data: timeSlot,
+      data: offDay,
     });
-  } catch (err: any) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: "Error setting off day", error: err.message });
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to set off day",
+      error: error.message,
+    });
   }
 };
 
@@ -168,7 +230,10 @@ export const getWorkerAvailability = async (req: Request, res: Response) => {
       date,
     });
 
-    if (!timeSlot) {
+    if (
+      !timeSlot ||
+      (timeSlot.isOffDay === false && timeSlot.slots.length === 0)
+    ) {
       timeSlot = new TimeSlotModel({
         worker: workerId,
         date,
@@ -176,14 +241,29 @@ export const getWorkerAvailability = async (req: Request, res: Response) => {
       });
     }
 
-    await timeSlot.save();
+    const requestedDate = new Date(date as string);
+    const today = new Date();
 
-    //     if (!timeSlot) {
-    //       res.status(404).json({
-    //         message: "No availability found for this worker on this date",
-    //       });
-    //       return;
-    //     }
+    const isToday =
+      requestedDate.getFullYear() === today.getFullYear() &&
+      requestedDate.getMonth() === today.getMonth() &&
+      requestedDate.getDate() === today.getDate();
+
+    if (isToday) {
+      const currentTime = today.getHours() * 60 + today.getMinutes();
+
+      const slotsToRemove = timeSlot.slots.filter((slot) => {
+        const [h, m] = slot.startTime.split(":").map(Number);
+        const slotStartMinutes = h * 60 + m;
+        return slotStartMinutes <= currentTime;
+      });
+
+      slotsToRemove.forEach((slot) => {
+        timeSlot!.slots.pull(slot._id);
+      });
+    }
+
+    await timeSlot.save();
 
     res.status(200).json({
       message: "Worker availability fetched successfully",

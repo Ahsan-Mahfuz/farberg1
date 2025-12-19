@@ -28,6 +28,7 @@ export interface ITimeSlot extends Document {
   date: Date;
   isOffDay: boolean;
   slots: Types.DocumentArray<ISlot>;
+  heldBy: Types.ObjectId | null;
 }
 
 const timeSlotSchema = new Schema<ITimeSlot>(
@@ -36,6 +37,7 @@ const timeSlotSchema = new Schema<ITimeSlot>(
     date: { type: Date, required: true },
     isOffDay: { type: Boolean, default: false },
     slots: [slotSchema],
+    heldBy: { type: Schema.Types.ObjectId, ref: "Customer", default: null },
   },
   { timestamps: true }
 );

@@ -5,11 +5,13 @@ import {
   getAllTransactions,
   getBookingTrends,
   getCustomerBookings,
+  getMonthlyRevenue,
   getWorkerBookings,
   getWorkerMonthlyCalendar,
   getWorkerPopularity,
   handleStripeWebhook,
   initializePayment,
+  updateBookingStatus,
 } from "./booking.controller";
 import { authenticateCustomer } from "../../middlewares/customerMiddleware";
 import { authenticateWorker } from "../../middlewares/workerMiddleware";
@@ -38,8 +40,7 @@ bookingRouter.get(
   getCustomerBookings
 );
 bookingRouter.get(
-  "/worker-monthly-calendar",
-  authenticateWorker,
+  "/worker-monthly-calendar/:workerId",
   getWorkerMonthlyCalendar
 );
 bookingRouter.get(
@@ -61,6 +62,16 @@ bookingRouter.get(
   "/get-all-transactions",
   authenticateAdminOrManager,
   getAllTransactions
+);
+bookingRouter.get(
+  "/get-monthly-revenue",
+  authenticateAdminOrManager,
+  getMonthlyRevenue
+);
+bookingRouter.patch(
+  "/update-booking-status/:bookingId",
+  authenticateWorker,
+  updateBookingStatus
 );
 
 export default bookingRouter;
