@@ -25,7 +25,7 @@ export const createUploadPhoto = async (req: Request, res: Response) => {
 
     const filePath = `/picture/dynamic_file/${req.file.filename}`;
 
-    const fullFileUrl = `http://${process.env.HOST}:${process.env.PORT}${filePath}`;
+    const fullFileUrl = `${filePath}`;
 
     const existingRecord = await UploadPhotoModel.findOne({
       title: validatedData.title.toLowerCase(),

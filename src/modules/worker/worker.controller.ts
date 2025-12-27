@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { WorkerModel } from "./worker.model";
-import { workerProfileSchema } from "./worker.validation";
+import {
+  updateWorkerProfileSchema,
+  workerProfileSchema,
+} from "./worker.validation";
 import { paginate } from "../../helper/paginationHelper";
 import { title } from "process";
 
@@ -46,7 +49,7 @@ export const registerWorker = async (req: Request, res: Response) => {
 
     const worker = new WorkerModel({
       ...parsed.data,
-      uploadPhoto: `http://${process?.env?.HOST}:${process?.env?.PORT}${data.uploadPhoto}`,
+      uploadPhoto: `${data.uploadPhoto}`,
       password: hashedPassword,
     });
 
@@ -90,19 +93,11 @@ export const updateWorker = async (req: Request, res: Response) => {
       }
     }
 
-    const parsed = workerProfileSchema.safeParse(data);
-    if (!parsed.success) {
-      res.status(400).json({ message: parsed.error.errors });
-      return;
-    }
-
     const updatedWorker = await WorkerModel.findByIdAndUpdate(
       id,
-      { $set: parsed.data },
+      { $set: data },
       { new: true }
-    ).select(
-      "-password -resetOtp -otpExpires -__v -otpVerified -createdAt -updatedAt"
-    );
+    ).select(" -resetOtp -otpExpires -__v -otpVerified -createdAt -updatedAt");
 
     res.status(200).json({
       message: "Worker updated successfully",
@@ -228,5 +223,39 @@ export const getAllWorker = async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error getting workers", error: err });
+  }
+};
+
+// --------------------
+// Delete Worker
+// --------------------
+export const toggleWorkerDelete = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const worker = await WorkerModel.findByIdAndDelete(id);
+
+    if (!worker) {
+      res.status(404).json({
+        success: false,
+        message: "Worker not found",
+      });
+      return;
+    }
+
+    // worker.isDeleted = !worker.isDeleted;
+    // await worker.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Worker deleted successfully`,
+      data: worker,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle worker delete status",
+      error,
+    });
   }
 };

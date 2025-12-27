@@ -1,6 +1,7 @@
 import express from "express";
 import {
   changePassword,
+  deleteManager,
   getAllManagers,
   getMyProfile,
   loginManger,
@@ -48,5 +49,6 @@ managerRouter.patch(
   authenticateAdmin,
   toggleBlockManager
 );
+managerRouter.delete("/manager-delete/:id", authenticateAdmin, deleteManager);
 
 export default managerRouter;

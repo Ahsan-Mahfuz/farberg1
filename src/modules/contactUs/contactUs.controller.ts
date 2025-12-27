@@ -121,3 +121,30 @@ export const updateStatusContactUsById = async (
     next(error);
   }
 };
+
+// -----------------------
+// Delete Contact Message
+// -----------------------
+export const deleteContactUsById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+
+    const deletedContact = await ContactUsModel.findByIdAndDelete(id);
+
+    if (!deletedContact) {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    res.status(200).json({
+      message: "Contact message deleted successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    next(error);
+  }
+};

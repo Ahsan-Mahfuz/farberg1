@@ -7,6 +7,7 @@ interface JwtPayload {
   email: string;
   role: string;
   isBlocked: boolean;
+  isDeleted: boolean;
 }
 
 export const authenticateCustomer = (
@@ -31,6 +32,12 @@ export const authenticateCustomer = (
     }
 
     if (decoded?.isBlocked) {
+      res.status(401).json({ message: "Unauthorized: User is blocked" });
+      return;
+    }
+
+    
+    if (decoded?.isDeleted) {
       res.status(401).json({ message: "Unauthorized: User is blocked" });
       return;
     }

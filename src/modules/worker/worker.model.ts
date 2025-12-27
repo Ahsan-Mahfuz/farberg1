@@ -23,6 +23,7 @@ export interface IWorker extends Document {
     service: Types.ObjectId | IService;
     subcategories?: Types.ObjectId[];
   }[];
+  isDeleted: boolean;
 }
 
 const workerSchema = new Schema<IWorker>(
@@ -44,6 +45,7 @@ const workerSchema = new Schema<IWorker>(
     otpExpires: { type: Date, default: null },
     otpVerified: { type: Boolean, default: false },
     role: { type: String, default: "worker" },
+    isDeleted: { type: Boolean, default: false },
     services: [
       {
         service: {

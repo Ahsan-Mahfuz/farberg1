@@ -12,6 +12,9 @@ import {
   getAllCustomers,
   toggleBlockUser,
   getOneCustomer,
+  toggleCustomerDelete,
+  superAdminUpdateCustomer,
+  superAdminUpdateWorker,
 } from "./customer.controller";
 import { photoUpload } from "../../uploads/profilePhotoUpload";
 import { customerOrWorkerMiddleware } from "../../middlewares/customerOrWorkerMiddleware";
@@ -55,5 +58,23 @@ customerOrWorkerRouter.patch(
   authenticateAdminOrManager,
   toggleBlockUser
 );
+customerRouter.delete(
+  "/customer-delete/:id",
+  authenticateAdminOrManager,
+  toggleCustomerDelete
+);
 
+customerRouter.patch(
+  "/update-profile/:id",
+  authenticateAdminOrManager,
+  photoUpload.single("customerProfileImage"),
+  superAdminUpdateCustomer
+);
+
+customerRouter.patch(
+  "/worker/:id",
+  authenticateAdminOrManager,
+  photoUpload.single("customerProfileImage"),
+  superAdminUpdateWorker
+);
 export { customerOrWorkerRouter, customerRouter };
