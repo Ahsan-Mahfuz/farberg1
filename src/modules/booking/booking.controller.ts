@@ -45,8 +45,8 @@ export const initializePayment = async (req: any, res: Response) => {
     const { bookingId } = req.body;
     const customerId = req.user.userId;
     const currency = "usd";
-    const success_url = "http://localhost:3000/success";
-    const cancel_url = "http://10.10.20.16:5137/cancel";
+    const success_url = "https://faberge1-webiste.vercel.app/success";
+    const cancel_url = "https://faberge1-webiste.vercel.app/cancel";
 
     const customer = await CustomerModel.findById(customerId);
     if (!customer) {
@@ -1056,7 +1056,7 @@ export const getAllTransactions = async (req: Request, res: Response) => {
     const result = await paginate(BookingModel, {
       page: Number(page),
       limit: Number(limit),
-      filter: { isPayment: true },
+      filter: { isPayment: true, isTransactionDeleted: false },
       sort: { createdAt: -1 },
     });
 
@@ -1077,6 +1077,43 @@ export const getAllTransactions = async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({
       message: "Error fetching transactions",
+      error: err.message,
+    });
+  }
+};
+
+export const getAllNotifications = async (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const result = await paginate(BookingModel, {
+      page: Number(page),
+      limit: Number(limit),
+      filter: { isNotificationDeleted: false },
+      sort: { createdAt: -1 },
+    });
+
+    const populatedData = await BookingModel.populate(result.data, [
+      { path: "customer", select: "firstName lastName email phone" },
+      {
+        path: "worker",
+        select: "firstName lastName phone uploadPhoto workerId",
+      },
+      {
+        path: "services.service",
+        model: "Service",
+        select: "serviceName price subcategory",
+      },
+    ]);
+
+    res.status(200).json({
+      message: "All notification fetched successfully",
+      pagination: result.pagination,
+      notification: populatedData,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      message: "Error fetching notification",
       error: err.message,
     });
   }
@@ -1239,5 +1276,122 @@ export const updateBookingStatus = async (req: any, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// --------------------
+// Delete Booking (Super Admin)
+// --------------------
+export const deleteBookingByAdmin = async (req: Request, res: Response) => {
+  try {
+    const { bookingId } = req.params;
+
+    const booking = await BookingModel.findById(bookingId);
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+
+    // if (booking.status === "completed") {
+    //   return res.status(400).json({
+    //     message: "Completed bookings cannot be deleted",
+    //   });
+    // }
+
+    // const timeSlotDoc = await TimeSlotModel.findOne({
+    //   worker: booking.worker,
+    //   date: booking.date,
+    // });
+
+    // if (timeSlotDoc) {
+    //   const slotIndex = timeSlotDoc.slots.findIndex(
+    //     (s) => s.startTime === booking.startTime
+    //   );
+
+    //   if (slotIndex !== -1) {
+    //     const slot = timeSlotDoc.slots[slotIndex];
+
+    //     slot.isAvailable = true;
+    //     slot.isBooked = false;
+    //     slot.heldBy = null;
+    //     slot.heldUntil = null;
+
+    //     if (timeSlotDoc.slots[slotIndex - 1])
+    //       timeSlotDoc.slots[slotIndex - 1].isBlocked = false;
+
+    //     if (timeSlotDoc.slots[slotIndex + 1])
+    //       timeSlotDoc.slots[slotIndex + 1].isBlocked = false;
+
+    //     await timeSlotDoc.save();
+    //   }
+    // }
+
+    await BookingModel.findByIdAndDelete(bookingId);
+
+    res.status(200).json({
+      message: "Booking deleted successfully by super admin",
+    });
+  } catch (error: any) {
+    console.error("Delete booking error:", error);
+    res.status(500).json({
+      message: "Failed to delete booking",
+      error: error.message,
+    });
+  }
+};
+
+export const deleteTransactionByAdmin = async (req: Request, res: Response) => {
+  try {
+    const { transactionId } = req.params;
+
+    const booking = await BookingModel.findById(transactionId);
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+
+    booking.isTransactionDeleted = true;
+
+    await booking.save();
+
+    res.status(200).json({
+      message: "Transaction deleted successfully ",
+    });
+  } catch (error: any) {
+    console.error("Delete transaction error:", error);
+    res.status(500).json({
+      message: "Failed to delete transaction",
+      error: error.message,
+    });
+  }
+};
+
+export const deleteNotificationByAdmin = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { notificationId } = req.params;
+    console.log(notificationId)
+
+    const booking = await BookingModel.findById(notificationId);
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+
+    booking.isNotificationDeleted = true;
+
+    await booking.save();
+
+    res.status(200).json({
+      message: "Notification deleted successfully ",
+    });
+  } catch (error: any) {
+    console.error("Delete notification error:", error);
+    res.status(500).json({
+      message: "Failed to delete notification",
+      error: error.message,
+    });
   }
 };

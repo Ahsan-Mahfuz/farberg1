@@ -3,6 +3,7 @@ import {
   getAllWorker,
   getOneWorker,
   registerWorker,
+  toggleWorkerDelete,
   updateWorker,
 } from "./worker.controller";
 import { authenticateAdmin } from "../../middlewares/adminMiddleware";
@@ -26,5 +27,10 @@ workerRouter.patch(
 );
 workerRouter.get("/get-one-worker/:id", getOneWorker);
 workerRouter.get("/get-all-worker", getAllWorker);
+workerRouter.delete(
+  "/delete-worker/:id",
+  authenticateAdminOrManager,
+  toggleWorkerDelete
+);
 
 export default workerRouter;

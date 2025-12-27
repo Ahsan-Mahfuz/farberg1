@@ -17,6 +17,8 @@ export interface IBooking extends Document {
   transactionId: { type: String; default: null };
   paymentAmount: Number;
   paymentExpiresAt: Date | null;
+  isTransactionDeleted: boolean;
+  isNotificationDeleted: boolean;
 }
 
 const bookingSchema = new Schema<IBooking>(
@@ -45,6 +47,8 @@ const bookingSchema = new Schema<IBooking>(
     isPayment: { type: Boolean, default: false },
     transactionId: { type: String, default: null },
     paymentExpiresAt: { type: Date, default: null },
+    isTransactionDeleted: { type: Boolean, default: false },
+    isNotificationDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

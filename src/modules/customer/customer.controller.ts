@@ -93,13 +93,13 @@ export const uploadProfilePicture = async (req: any, res: Response) => {
     }
 
     const profileImagePath = `/picture/profile_image/${req.file.filename}`;
-    user.uploadPhoto = `http://${process?.env?.HOST}:${process?.env?.PORT}${profileImagePath}`;
+    user.uploadPhoto = `${profileImagePath}`;
     await user.save();
 
     res.json({
       message: "Profile picture uploaded successfully",
       data: {
-        customerProfileImage: `http://${process?.env?.HOST}:${process?.env?.PORT}${profileImagePath}`,
+        customerProfileImage: `${profileImagePath}`,
       },
     });
   } catch (err) {
@@ -122,9 +122,7 @@ export const loginCustomerOrWorker = async (
     const found = await findUserByEmail(email);
 
     if (found && found?.user?.isBlocked) {
-      res
-        .status(400)
-        .json({ message: "Your account is blocked" });
+      res.status(400).json({ message: "Your account is blocked" });
       return;
     }
 
@@ -153,6 +151,7 @@ export const loginCustomerOrWorker = async (
         email: user.email,
         role: user.role,
         isBlocked: user.isBlocked,
+        isDeleted: user.isDeleted,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
@@ -182,7 +181,7 @@ export const getMyProfile = async (req: any, res: Response) => {
     }
 
     const user = await CustomerModel.findById(userId).select(
-      "-password -__v -otpVerified -resetOtp -otpExpires"
+      "-password -__v -otpVerified -resetOtp -otpExpires -isDeleted"
     );
     if (!user) {
       res.status(404).json({ message: "Customer not found" });
@@ -237,7 +236,7 @@ export const updateProfile = async (req: any, res: Response) => {
         {
           new: true,
         }
-      ).select("-password");
+      ).select("-password -isDeleted");
 
       if (!updatedWorker) {
         res.status(404).json({ message: "Worker not found" });
@@ -532,5 +531,150 @@ export const getOneCustomer = async (req: Request, res: Response) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+
+// --------------------
+// Delete Customer
+// --------------------
+export const toggleCustomerDelete = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await CustomerModel.findByIdAndDelete(id);
+
+    if (!customer) {
+      res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+      return;
+    }
+
+    // customer.isDeleted = !customer.isDeleted;
+    // await customer.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Customer deleted successfully`,
+      data: customer,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle customer delete status",
+      error,
+    });
+  }
+};
+
+// ------------------------
+// Update Customer (Superadmin)
+// ------------------------
+export const superAdminUpdateCustomer = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    let data = req.body;
+
+    if (data.services && typeof data.services === "string") {
+      try {
+        data.services = JSON.parse(data.services);
+      } catch {
+        res.status(400).json({ message: "Invalid JSON in services field" });
+        return;
+      }
+    }
+
+    const uploadedPhotoPath = req.file
+      ? `/picture/profile_image/${req.file.filename}`
+      : undefined;
+
+    const updateData = {
+      ...data,
+      ...(uploadedPhotoPath ? { uploadPhoto: uploadedPhotoPath } : {}),
+    };
+
+    const updatedCustomer = await CustomerModel.findByIdAndUpdate(
+      id,
+      updateData,
+      {
+        new: true,
+      }
+    ).select("-password");
+
+    if (!updatedCustomer) {
+      res.status(404).json({ message: "Customer not found" });
+      return;
+    }
+
+    res.json({
+      message: "Customer updated successfully",
+      data: updatedCustomer,
+    });
+    return;
+  } catch (err: any) {
+    res.status(500).json({
+      message: err.errors?.[0]?.message || "Error updating customer",
+      error: err.message,
+    });
+    return;
+  }
+};
+
+// ------------------------
+// Update Worker (Superadmin)
+// ------------------------
+export const superAdminUpdateWorker = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    let data = req.body;
+
+    if (data.services && typeof data.services === "string") {
+      try {
+        data.services = JSON.parse(data.services);
+      } catch {
+        res.status(400).json({ message: "Invalid JSON in services field" });
+        return;
+      }
+    }
+
+    const uploadedPhotoPath = req.file
+      ? `/picture/profile_image/${req.file.filename}`
+      : undefined;
+
+    const parsed = workerProfileSchema.partial().safeParse(data);
+    if (!parsed.success) {
+      res.status(400).json({ message: parsed.error.errors });
+      return;
+    }
+
+    delete (parsed.data as any).email;
+    delete (parsed.data as any).password;
+
+    const updateData = {
+      ...parsed.data,
+      ...(uploadedPhotoPath ? { uploadPhoto: uploadedPhotoPath } : {}),
+    };
+
+    const updatedWorker = await WorkerModel.findByIdAndUpdate(id, updateData, {
+      new: true,
+    }).select("-password -isDeleted");
+
+    if (!updatedWorker) {
+      res.status(404).json({ message: "Worker not found" });
+      return;
+    }
+
+    res.json({
+      message: "Worker updated successfully",
+      data: updatedWorker,
+    });
+    return;
+  } catch (err: any) {
+    res.status(500).json({
+      message: err.errors?.[0]?.message || "Error updating worker",
+      error: err.message,
+    });
+    return;
   }
 };

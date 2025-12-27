@@ -18,6 +18,7 @@ export interface IManager extends Document {
   otpVerified?: boolean;
   role: string;
   accessibility?: Types.ObjectId | IAccessibility;
+  // isDeleted: boolean;
 }
 
 const managerSchema = new Schema<IManager>(
@@ -42,6 +43,7 @@ const managerSchema = new Schema<IManager>(
       ref: "Accessibility",
       default: null,
     },
+    // isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

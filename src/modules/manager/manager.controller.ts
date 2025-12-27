@@ -57,7 +57,7 @@ export const registerManager = async (req: Request, res: Response) => {
     const manager = new ManagerModel({
       ...parsed.data,
       accessibility: accessibility._id,
-      uploadPhoto: `http://${process?.env?.HOST}:${process?.env?.PORT}${data.uploadPhoto}`,
+      uploadPhoto: `${data.uploadPhoto}`,
       password: hashedPassword,
     });
 
@@ -119,6 +119,7 @@ export const loginManger = async (
         uploadPhoto: user.uploadPhoto,
         accessibility: user.accessibility,
         isBlocked: user.isBlocked,
+        // isDeleted: user.isDeleted,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
@@ -144,7 +145,7 @@ export const getMyProfile = async (req: any, res: Response) => {
 
     const user = await ManagerModel.findById(userId)
       .populate("accessibility")
-      .select("-password -_v -otpVerified -resetOtp -otpExpires");
+      .select("-password -_v -otpVerified -resetOtp -otpExpires -isDeleted");
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
@@ -182,7 +183,7 @@ export const updateProfile = async (req: any, res: Response) => {
       ...data,
       ...(uploadedPhotoPath
         ? {
-            uploadPhoto: `http://${process?.env?.HOST}:${process?.env?.PORT}${uploadedPhotoPath}`,
+            uploadPhoto: `${uploadedPhotoPath}`,
           }
         : {}),
     };
@@ -191,7 +192,7 @@ export const updateProfile = async (req: any, res: Response) => {
       userId,
       updateData,
       { new: true }
-    ).select("-password -email");
+    ).select("-password -email -isDeleted");
 
     if (!updatedManager) {
       res.status(404).json({ message: "Manager not found" });
@@ -416,7 +417,6 @@ export const changePassword = async (req: any, res: Response) => {
 // --------------------
 // Get All Managers (with Search)
 // --------------------
-
 export const getAllManagers = async (req: Request, res: Response) => {
   try {
     const { search } = req.query;
@@ -454,6 +454,38 @@ export const getAllManagers = async (req: Request, res: Response) => {
       success: false,
       message: "Failed to fetch managers",
       error: error.message,
+    });
+  }
+};
+
+// --------------------
+// Delete Manager
+// --------------------
+
+export const deleteManager = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const manager = await ManagerModel.findByIdAndDelete(id);
+
+    if (!manager) {
+      res.status(404).json({
+        success: false,
+        message: "Manager not found",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Manager has been deleted successfully",
+      data: manager,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete manager",
+      error,
     });
   }
 };

@@ -16,6 +16,7 @@ export interface ICustomer extends Document {
   otpExpires?: Date | null;
   otpVerified?: boolean;
   role: string;
+  isDeleted: boolean;
 }
 
 const customerSchema = new Schema<ICustomer>(
@@ -35,6 +36,7 @@ const customerSchema = new Schema<ICustomer>(
     otpExpires: { type: Date, default: null },
     otpVerified: { type: Boolean, default: false },
     role: { type: String, default: "customer" },
+    isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

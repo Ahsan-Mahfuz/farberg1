@@ -1,7 +1,11 @@
 import express from "express";
 import {
   bookTimeSlot,
+  deleteBookingByAdmin,
+  deleteNotificationByAdmin,
+  deleteTransactionByAdmin,
   getAllBookings,
+  getAllNotifications,
   getAllTransactions,
   getBookingTrends,
   getCustomerBookings,
@@ -64,6 +68,11 @@ bookingRouter.get(
   getAllTransactions
 );
 bookingRouter.get(
+  "/get-all-notifications",
+  authenticateAdminOrManager,
+  getAllNotifications
+);
+bookingRouter.get(
   "/get-monthly-revenue",
   authenticateAdminOrManager,
   getMonthlyRevenue
@@ -72,6 +81,24 @@ bookingRouter.patch(
   "/update-booking-status/:bookingId",
   authenticateWorker,
   updateBookingStatus
+);
+
+bookingRouter.delete(
+  "/delete-booking/:bookingId",
+  authenticateAdminOrManager,
+  deleteBookingByAdmin
+);
+bookingRouter.delete(
+  "/delete-transaction/:transactionId",
+  authenticateAdminOrManager,
+  deleteTransactionByAdmin
+);
+
+
+bookingRouter.delete(
+  "/delete-notification/:notificationId",
+  authenticateAdminOrManager,
+  deleteNotificationByAdmin
 );
 
 export default bookingRouter;

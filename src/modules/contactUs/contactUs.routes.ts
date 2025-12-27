@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   createContactUs,
+  deleteContactUsById,
   getContactUs,
   getContactUsById,
   updateStatusContactUsById,
@@ -28,6 +29,12 @@ contactUsRouter.get(
   "/update-status-contact-us/:id",
   authenticateAdminOrManager,
   updateStatusContactUsById
+);
+
+contactUsRouter.delete(
+  "/delete-contact-us/:id",
+  authenticateAdminOrManager,
+  deleteContactUsById
 );
 
 export default contactUsRouter;
